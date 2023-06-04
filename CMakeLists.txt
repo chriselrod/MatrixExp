@@ -6,6 +6,8 @@ option(ENABLE_NATIVE_COMPILATION "Compile with -march=native" ON)
 
 include(FetchContent)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
@@ -25,7 +27,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     ${PROJECT_NAME}
     PRIVATE -fmax-errors=2 -fconcepts-diagnostics-depth=4
             -fno-semantic-interposition -fdiagnostics-color=always
-            -fverbose-asm)
+            -fverbose-asm -fweb -frename-registers -funroll-loops)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)

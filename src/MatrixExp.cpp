@@ -45,7 +45,7 @@ public:
   }
   constexpr auto operator/(const Dual &other) const -> Dual {
     return {val / other.val, (other.val * partials - val * other.partials) /
-                                 (other.val * other.val)};
+                               (other.val * other.val)};
   }
   constexpr auto operator+=(const Dual &other) -> Dual & {
     val += other.val;
@@ -65,7 +65,7 @@ public:
   constexpr auto operator/=(const Dual &other) -> Dual & {
     val /= other.val;
     partials =
-        (other.val * partials - val * other.partials) / (other.val * other.val);
+      (other.val * partials - val * other.partials) / (other.val * other.val);
     return *this;
   }
   constexpr auto operator+(double other) const -> Dual {
@@ -153,8 +153,7 @@ template <class D> struct URand {
   static constexpr size_t N = D::num_partials;
   auto operator()(std::mt19937_64 &mt) -> D {
     Dual<T, N> x{URand<T>{}(mt)};
-    for (size_t i = 0; i < N; ++i)
-      x.gradient()[i] = URand<T>{}(mt);
+    for (size_t i = 0; i < N; ++i) x.gradient()[i] = URand<T>{}(mt);
     return x;
   }
 };
@@ -203,6 +202,7 @@ constexpr void evalpoly(T &B, const T &C, const auto &p) {
 template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   using S = decltype(extractDualValRecurse(std::declval<eltype_t<T>>()));
   size_t n = size_t(A.numRow());
+  invariant(n > 0);
   Vector<S> v;
   v.resizeForOverwrite(n);
   invariant(A.numRow() > 0);
@@ -240,41 +240,42 @@ template <AbstractMatrix T> constexpr auto expm(const T &A) {
     evalpoly(V, A2, p1);
   } else {
     s = std::max(int(std::ceil(std::log2(nA / 5.4))), 0);
+    double t = 1.0;
     if (s > 0) {
-      double t = 1.0 / std::exp2(s);
+      t = 1.0 / std::exp2(s);
       A2 *= (t * t);
     }
-    SquareMatrix<S> A4{A2 * A2};
-    SquareMatrix<S> A6{A2 * A4};
+    SquareMatrix<S> A4{A2 * A2}, A6{A2 * A4};
 
     V << A6 * (A6 + 16380 * A4 + 40840800 * A2) +
-             (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2) +
-             32382376266240000 * I;
+           (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2) +
+           32382376266240000 * I;
     U << A * V;
+    if (s > 0) U *= t;
     V << A6 * (182 * A6 + 960960 * A4 + 1323241920 * A2) +
-             (670442572800 * A6 + 129060195264000 * A4 +
-              7771770303897600 * A2) +
+           (670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2) +
 
-             64764752532480000 * I;
+           64764752532480000 * I;
   }
-  for (auto a = A2.begin(), v = V.begin(), u = U.begin(), e = A2.end(); a != e;
-       ++a, ++v, ++u) {
-    *a = *v - *u;
+  for (auto v = V.begin(), u = U.begin(), e = V.end(); v != e; ++v, ++u) {
+    auto &&d = *v - *u;
     *v += *u;
+    *u = d;
   }
   // return (V - U) \ (V + U);
-  LU::fact(std::move(A2)).ldiv(MutPtrMatrix<S>(V));
+  LU::fact(std::move(U)).ldiv(MutPtrMatrix<S>(V));
   for (; s--;) {
-    U = V * V;
-    std::swap(U, V);
+    A2 = V * V;
+    std::swap(A2, V);
   }
-  return V;
+  return std::move(V); // TODO: no swap for NRVO?
 }
 
 template <typename T> static void expm(T *A, T *B, size_t N) {
-  auto B_ = SquarePtrMatrix<T>(B, N);
-  MutSquarePtrMatrix<T>(A, N) << expm(B_);
+  MutSquarePtrMatrix<T>(A, N) << expm(SquarePtrMatrix<T>(B, N));
 }
+
+template <size_t N, size_t M> using DDual = Dual<Dual<double, N>, M>;
 
 extern "C" {
 void __attribute__((visibility("default")))
@@ -299,34 +300,83 @@ expmf64d4(Dual<double, 4> *A, Dual<double, 4> *B, size_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
+expmf64d5(Dual<double, 5> *A, Dual<double, 5> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d6(Dual<double, 6> *A, Dual<double, 6> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d7(Dual<double, 7> *A, Dual<double, 7> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
 expmf64d8(Dual<double, 8> *A, Dual<double, 8> *B, size_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64ddyn(void *A, void *B, size_t N, size_t D) {
-  switch (D) {
-  case 1:
-    expm(static_cast<Dual<double, 1> *>(A), static_cast<Dual<double, 1> *>(B),
-         N);
-    break;
-  case 2:
-    expm(static_cast<Dual<double, 2> *>(A), static_cast<Dual<double, 2> *>(B),
-         N);
-    break;
-  case 3:
-    expm(static_cast<Dual<double, 3> *>(A), static_cast<Dual<double, 3> *>(B),
-         N);
-    break;
-  case 4:
-    expm(static_cast<Dual<double, 4> *>(A), static_cast<Dual<double, 4> *>(B),
-         N);
-    break;
-  case 8:
-    expm(static_cast<Dual<double, 8> *>(A), static_cast<Dual<double, 8> *>(B),
-         N);
-    break;
-  default:
-    abort();
-  }
+expmf64d1d1(DDual<1, 1> *A, DDual<1, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d1d2(DDual<1, 2> *A, DDual<1, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d2d1(DDual<2, 1> *A, DDual<2, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d2d2(DDual<2, 2> *A, DDual<2, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d3d1(DDual<3, 1> *A, DDual<3, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d3d2(DDual<3, 2> *A, DDual<3, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d4d1(DDual<4, 1> *A, DDual<4, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d4d2(DDual<4, 2> *A, DDual<4, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d5d1(DDual<5, 1> *A, DDual<5, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d5d2(DDual<5, 2> *A, DDual<5, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d6d1(DDual<6, 1> *A, DDual<6, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d6d2(DDual<6, 2> *A, DDual<6, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d7d1(DDual<7, 1> *A, DDual<7, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d7d2(DDual<7, 2> *A, DDual<7, 2> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d8d1(DDual<8, 1> *A, DDual<8, 1> *B, size_t N) {
+  expm(A, B, N);
+}
+void __attribute__((visibility("default")))
+expmf64d8d2(DDual<8, 2> *A, DDual<8, 2> *B, size_t N) {
+  expm(A, B, N);
 }
 }
