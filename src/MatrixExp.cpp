@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <random>
 
+namespace poly::math {
+
 template <class T, size_t N> class Dual {
   T val{};
   SVector<T, N> partials{};
@@ -142,7 +144,8 @@ constexpr auto operator/(double other, Dual<T, N> x) -> Dual<T, N> {
   return {other / x.value(), -other * x.gradient() / (x.value() * x.value())};
 }
 constexpr size_t L = 16;
-static_assert(ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>, L>>);
+static_assert(
+  utils::ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>, L>>);
 // auto x = Dual<Dual<double, 4>, 2>{1.0};
 // auto y = x * 3.4;
 
@@ -171,7 +174,7 @@ constexpr auto extractDualValRecurse(const Dual<T, N> &x) {
   // return x.value();
 }
 template <AbstractMatrix T> constexpr auto evalpoly(const T &C, const auto &p) {
-  using U = eltype_t<T>;
+  using U = utils::eltype_t<T>;
   using S = SquareMatrix<U, L>;
   assert(C.numRow() == C.numCol());
   S A{SquareDims{C.numRow()}}, B{SquareDims{C.numRow()}};
@@ -184,7 +187,7 @@ template <AbstractMatrix T> constexpr auto evalpoly(const T &C, const auto &p) {
 }
 template <AbstractMatrix T>
 constexpr void evalpoly(T &B, const T &C, const auto &p) {
-  using U = eltype_t<T>;
+  using U = utils::eltype_t<T>;
   using S = SquareMatrix<U, L>;
   size_t N = p.size();
   invariant(N > 0);
@@ -200,7 +203,7 @@ constexpr void evalpoly(T &B, const T &C, const auto &p) {
 }
 
 template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
-  using S = decltype(extractDualValRecurse(std::declval<eltype_t<T>>()));
+  using S = decltype(extractDualValRecurse(std::declval<utils::eltype_t<T>>()));
   size_t n = size_t(A.numRow());
   invariant(n > 0);
   Vector<S> v;
@@ -215,14 +218,14 @@ template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
 }
 
 template <AbstractMatrix T> constexpr auto expm(const T &A) {
-  using S = eltype_t<T>;
+  using S = utils::eltype_t<T>;
   unsigned n = unsigned(A.numRow());
   auto nA = opnorm1(A);
   SquareMatrix<S, L> A2{A * A}, U{SquareDims{n}}, V{SquareDims{n}};
   SquareMatrix<S, L> *Up = &U, *Vp = &V;
   unsigned int s = 0;
   if (nA <= 2.1) {
-    TinyVector<double, 5> p0, p1;
+    containers::TinyVector<double, 5> p0, p1;
     if (nA > 0.95) {
       p0 = {1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0};
       p1 = {90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10};
@@ -278,6 +281,9 @@ template <AbstractMatrix T> constexpr auto expm(const T &A) {
 template <typename T> static void expm(T *A, T *B, size_t N) {
   MutSquarePtrMatrix<T>(A, N) << expm(SquarePtrMatrix<T>(B, N));
 }
+} // namespace poly::math
+
+using poly::math::expm, poly::math::Dual;
 
 template <size_t N, size_t M> using DDual = Dual<Dual<double, N>, M>;
 
