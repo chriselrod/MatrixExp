@@ -141,7 +141,8 @@ template <class T, size_t N>
 constexpr auto operator/(double other, Dual<T, N> x) -> Dual<T, N> {
   return {other / x.value(), -other * x.gradient() / (x.value() * x.value())};
 }
-static_assert(ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>>>);
+constexpr size_t L = 16;
+static_assert(ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>, L>>);
 // auto x = Dual<Dual<double, 4>, 2>{1.0};
 // auto y = x * 3.4;
 
@@ -169,10 +170,9 @@ constexpr auto extractDualValRecurse(const Dual<T, N> &x) {
   return extractDualValRecurse(x.value());
   // return x.value();
 }
-
 template <AbstractMatrix T> constexpr auto evalpoly(const T &C, const auto &p) {
   using U = eltype_t<T>;
-  using S = SquareMatrix<U>;
+  using S = SquareMatrix<U, L>;
   assert(C.numRow() == C.numCol());
   S A{SquareDims{C.numRow()}}, B{SquareDims{C.numRow()}};
   B << p[0] * C + I * p[1];
@@ -185,7 +185,7 @@ template <AbstractMatrix T> constexpr auto evalpoly(const T &C, const auto &p) {
 template <AbstractMatrix T>
 constexpr void evalpoly(T &B, const T &C, const auto &p) {
   using U = eltype_t<T>;
-  using S = SquareMatrix<U>;
+  using S = SquareMatrix<U, L>;
   size_t N = p.size();
   invariant(N > 0);
   invariant(size_t(C.numRow()), size_t(C.numCol()));
@@ -218,7 +218,8 @@ template <AbstractMatrix T> constexpr auto expm(const T &A) {
   using S = eltype_t<T>;
   unsigned n = unsigned(A.numRow());
   auto nA = opnorm1(A);
-  SquareMatrix<S> A2{A * A}, U{SquareDims{n}}, V{SquareDims{n}};
+  SquareMatrix<S, L> A2{A * A}, U{SquareDims{n}}, V{SquareDims{n}};
+  SquareMatrix<S, L> *Up = &U, *Vp = &V;
   unsigned int s = 0;
   if (nA <= 2.1) {
     TinyVector<double, 5> p0, p1;
@@ -244,31 +245,34 @@ template <AbstractMatrix T> constexpr auto expm(const T &A) {
     if (s > 0) {
       t = 1.0 / std::exp2(s);
       A2 *= (t * t);
+      if (s & 1) std::swap(Up, Vp);
     }
-    SquareMatrix<S> A4{A2 * A2}, A6{A2 * A4};
+    SquareMatrix<S, L> A4{A2 * A2}, A6{A2 * A4};
 
-    V << A6 * (A6 + 16380 * A4 + 40840800 * A2) +
-           (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2) +
-           32382376266240000 * I;
-    U << A * V;
-    if (s > 0) U *= t;
-    V << A6 * (182 * A6 + 960960 * A4 + 1323241920 * A2) +
-           (670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2) +
+    *Vp << A6 * (A6 + 16380 * A4 + 40840800 * A2) +
+             (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2) +
+             32382376266240000 * I;
+    *Up << A * (*Vp);
+    if (s > 0) (*Up) *= t;
+    *Vp << A6 * (182 * A6 + 960960 * A4 + 1323241920 * A2) +
+             (670442572800 * A6 + 129060195264000 * A4 +
+              7771770303897600 * A2) +
 
-           64764752532480000 * I;
+             64764752532480000 * I;
   }
-  for (auto v = V.begin(), u = U.begin(), e = V.end(); v != e; ++v, ++u) {
+  for (auto v = Vp->begin(), u = Up->begin(), e = Vp->end(); v != e; ++v, ++u) {
     auto &&d = *v - *u;
     *v += *u;
     *u = d;
   }
   // return (V - U) \ (V + U);
-  LU::fact(std::move(U)).ldiv(MutPtrMatrix<S>(V));
+  // LU::fact(std::move(U)).ldiv(MutPtrMatrix<S>(V));
+  LU::ldiv(*Up, MutPtrMatrix<S>(*Vp));
   for (; s--;) {
-    A2 = V * V;
-    std::swap(A2, V);
+    *Up = (*Vp) * (*Vp);
+    std::swap(Up, Vp);
   }
-  return std::move(V); // TODO: no swap for NRVO?
+  return V;
 }
 
 template <typename T> static void expm(T *A, T *B, size_t N) {

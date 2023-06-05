@@ -1,0 +1,146 @@
+[
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -o CMakeFiles/MatrixExp.dir/src/MatrixExp.cpp.o -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/src/MatrixExp.cpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/src/MatrixExp.cpp",
+  "output": "CMakeFiles/MatrixExp.dir/src/MatrixExp.cpp.o"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Containers/TinyVector.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Containers/TinyVector.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Containers/Storage.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Containers/Storage.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Invariant.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Invariant.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Array.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Array.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/ArrayOps.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/ArrayOps.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Indexing.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Indexing.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/AxisTypes.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/AxisTypes.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Show.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Show.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Iterators.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Iterators.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/MatrixDimensions.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/MatrixDimensions.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Matrix.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Matrix.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/TypePromotion.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/TypePromotion.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Vector.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Vector.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Rational.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Rational.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/GreatestCommonDivisor.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/GreatestCommonDivisor.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Optional.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Optional.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Valid.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Valid.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/LinearAlgebra.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/LinearAlgebra.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Constructors.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Constructors.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Allocators.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Utilities/Allocators.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Containers/UnrolledList.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Containers/UnrolledList.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Math.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/Math.hpp"
+},
+
+{
+  "directory": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang",
+  "command": "/bin/clang++ -DMatrixExp_EXPORTS -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include -I/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-build/PackageProjectInclude -march=native -mtune=native -O3 -pipe -DNDEBUG -fno-plt -fomit-frame-pointer -O3 -DNDEBUG -std=gnu++20 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -ferror-limit=2 -fcolor-diagnostics -march=native -mprefer-vector-width=512 -fno-exceptions -fno-rtti -fstrict-aliasing -fno-plt -fstrict-overflow -fomit-frame-pointer -fno-signed-zeros -fassociative-math -ffinite-math-only -fno-trapping-math -Wall -Wshadow -Wextra -save-temps -c /home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/StaticArrays.hpp",
+  "file": "/home/chriselrod/Documents/progwork/cxx/MatrixExp/buildclang/_deps/math-src/include/Math/StaticArrays.hpp"
+}
+]

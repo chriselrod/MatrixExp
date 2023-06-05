@@ -1,5 +1,20 @@
 using LinearAlgebra, Statistics, ForwardDiff, BenchmarkTools, Test
 
+const BENCH_OPNORMS = (66.0, 33.0, 22.0, 11.0, 6.0, 3.0, 2.0, 0.5, 0.03, 0.001)
+
+"""
+Generates one random matrix per opnorm.
+All generated matrices are scale multiples of one another.
+This is meant to exercise all code paths in the `expm` function.
+"""
+function randmatrices(n)
+  A = randn(n, n)
+  op = opnorm(A, 1)
+  map(BENCH_OPNORMS) do x
+    (x / op) .* A
+  end
+end
+
 function expm(A::AbstractMatrix{S}) where {S}
   # omitted: matrix balancing, i.e., LAPACK.gebal!
   nA = opnorm(A, 1)
@@ -270,37 +285,80 @@ for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
 end
 
 d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
+
+# macros are too awkward to work with, so we use a function
+# mean times are much better for benchmarking than minimum
+# whenever you have a function that allocates
+function bmean(f)
+  b = @benchmark $f()
+  m = BenchmarkTools.mean(b)
+  a = BenchmarkTools.allocs(m)
+  println(
+    "  ",
+    (BenchmarkTools).prettytime((BenchmarkTools).time(m)),
+    " (",
+    a,
+    " allocation",
+    (a == 1 ? "" : "s"),
+    ": ",
+    (BenchmarkTools).prettymemory((BenchmarkTools).memory(m)),
+    ")"
+  )
+end
+#=
+struct Closure{F,A}
+  f::F
+  a::A
+end
+Closure(f, a, b...) = Closure(f, (a, b...))
+(c::Closure)() = c.f(c.a...)
+=#
+struct ForEach{A,B,F}
+  f::F
+  a::A
+  b::B
+end
+ForEach(f, b) = ForEach(f, nothing, b)
+(f::ForEach)() = foreach(Base.Fix1(f.f, f.a), f.b)
+(f::ForEach{Nothing})() = foreach(f.f, f.b)
+
+function dualify(A, n, j)
+  if n > 0
+    A = d.(A, n)
+    if (j > 0)
+      A = d.(A, j)
+    end
+  end
+  A
+end
+
 for l = 1:5
   println("Size $l x $l:")
   for j = 0:2
     for n = (j!=0):8
-      A = randn(l, l)
-      if n > 0
-        A = d.(A, n)
-        if (j > 0)
-          A = d.(A, j)
-        end
+      As = map(x -> dualify(x, n, j), randmatrices(l))
+      B = similar(first(As))
+      C = similar(B)
+      D = similar(B)
+      for A in As
+        expm!(C, A)
+        gccexpm!(B, A)
+        clangexpm!(D, A)
+        E = expm(A)
+        @test reinterpret(Float64, C) ≈
+              reinterpret(Float64, B) ≈
+              reinterpret(Float64, D) ≈
+              reinterpret(Float64, E)
       end
-      B = similar(A)
-      C = similar(A)
-      D = similar(A)
-      expm!(C, A)
-      gccexpm!(B, A)
-      clangexpm!(D, A)
-      E = expm(A)
-      @test reinterpret(Float64, C) ≈
-            reinterpret(Float64, B) ≈
-            reinterpret(Float64, D) ≈
-            reinterpret(Float64, E)
-      println("Size $l x $l, duals (n,j) = ($n,$j), T = $(eltype(A)):")
+      println("Size $l x $l, duals (n,j) = ($n,$j), T = $(eltype(B)):")
       print("Out of place Julia: ")
-      @btime expm($A)
+      bmean(ForEach(expm, As))
       print("In place     Julia: ")
-      @btime expm!($B, $A)
+      bmean(ForEach(expm!, B, As))
       print("Out of place GCC:   ")
-      @btime gccexpm!($B, $A)
+      bmean(ForEach(gccexpm!, B, As))
       print("Out of place Clang: ")
-      @btime clangexpm!($B, $A)
+      bmean(ForEach(clangexpm!, B, As))
     end
   end
 end
