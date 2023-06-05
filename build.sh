@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 if [ ! -d "buildgcc" ]; then
     CXX=g++ cmake -S . -B buildgcc -DCMAKE_BUILD_TYPE=Release
 fi
