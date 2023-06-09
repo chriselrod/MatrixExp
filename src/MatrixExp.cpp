@@ -170,7 +170,6 @@ constexpr auto extractDualValRecurse(const auto &x) { return x; }
 template <class T, size_t N>
 constexpr auto extractDualValRecurse(const Dual<T, N> &x) {
   return extractDualValRecurse(x.value());
-  // return x.value();
 }
 template <typename T>
 constexpr auto evalpoly(MutSquarePtrMatrix<T> C, const auto &p) {
@@ -216,7 +215,7 @@ template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
 }
 
 template <typename T>
-constexpr auto expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
+constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
   invariant(size_t(V.numRow()), size_t(A.numRow()));
   unsigned n = unsigned(A.numRow());
   auto nA = opnorm1(A);
@@ -266,14 +265,11 @@ constexpr auto expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
     *v += *u;
     *u = d;
   }
-  // return (V - U) \ (V + U);
-  // LU::fact(std::move(U)).ldiv(MutPtrMatrix<S>(V));
   LU::ldiv(U, MutPtrMatrix<T>(V));
   for (; s--;) {
     U << V * V;
     std::swap(U, V);
   }
-  return V;
 }
 template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
   SquareMatrix<T, L> V{SquareDims{A.numRow()}};

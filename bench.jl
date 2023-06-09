@@ -332,6 +332,7 @@ function dualify(A, n, j)
   A
 end
 
+const COMPILE_TIMES = zeros(Int, 4)
 for l = 1:5
   println("Size $l x $l:")
   for j = 0:2
@@ -341,10 +342,30 @@ for l = 1:5
       C = similar(B)
       D = similar(B)
       for A in As
-        expm!(C, A)
+        Base.cumulative_compile_timing(true)
+        tgcc_start = Base.cumulative_compile_time_ns()
         gccexpm!(B, A)
+        Base.cumulative_compile_timing(false)
+        tgcc = Base.cumulative_compile_time_ns()[1] - tgcc_start[1]
+        Base.cumulative_compile_timing(true)
+        tclang_start = Base.cumulative_compile_time_ns()
         clangexpm!(D, A)
+        Base.cumulative_compile_timing(false)
+        tclang = Base.cumulative_compile_time_ns()[1] - tclang_start[1]
+        Base.cumulative_compile_timing(true)
+        t_start = Base.cumulative_compile_time_ns()
+        expm!(C, A)
+        Base.cumulative_compile_timing(false)
+        t = Base.cumulative_compile_time_ns()[1] - t_start[1]
+        Base.cumulative_compile_timing(true)
+        t0_start = Base.cumulative_compile_time_ns()
         E = expm(A)
+        Base.cumulative_compile_timing(false)
+        t0 = Base.cumulative_compile_time_ns()[1] - t0_start[1]
+        COMPILE_TIMES[1] += t0
+        COMPILE_TIMES[2] += t
+        COMPILE_TIMES[3] += tgcc
+        COMPILE_TIMES[4] += tclang
         @test reinterpret(Float64, C) ≈
               reinterpret(Float64, B) ≈
               reinterpret(Float64, D) ≈
@@ -362,3 +383,14 @@ for l = 1:5
     end
   end
 end
+println(
+  "Total compile times: \nOut of place Julia: ",
+  (BenchmarkTools).prettytime(COMPILE_TIMES[1]),
+  "\nIn place     Julia: ",
+  (BenchmarkTools).prettytime(COMPILE_TIMES[2]),
+  "\nOut of place GCC:   ",
+  (BenchmarkTools).prettytime(COMPILE_TIMES[3]),
+  "\nOut of place Clang: ",
+  (BenchmarkTools).prettytime(COMPILE_TIMES[4]),
+  "\n"
+)
