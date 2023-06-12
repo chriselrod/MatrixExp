@@ -22,7 +22,7 @@ public:
   static constexpr size_t num_partials = N;
   constexpr Dual() = default;
   constexpr Dual(T v) : val(v) {}
-  constexpr Dual(T v, size_t n) : val(v) { partials[n] = T{1}; }
+  constexpr Dual(T v, ptrdiff_t n) : val(v) { partials[n] = T{1}; }
   constexpr Dual(T v, SVector<T, N> g) : val(v), partials(g) {}
   constexpr Dual(std::integral auto v) : val(v) {}
   constexpr Dual(std::floating_point auto v) : val(v) {}
@@ -32,8 +32,6 @@ public:
   [[nodiscard]] constexpr auto gradient() const -> const SVector<T, N> & {
     return partials;
   }
-  // constexpr auto operator[](size_t i) const -> T { return grad[i]; }
-  // constexpr auto operator[](size_t i) -> T & { return grad[i]; }
   constexpr auto operator-() const -> Dual { return Dual(-val, -partials); }
   constexpr auto operator+(const Dual &other) const -> Dual {
     return {val + other.val, partials + other.partials};
@@ -156,7 +154,7 @@ template <class D> struct URand {
   static constexpr size_t N = D::num_partials;
   auto operator()(std::mt19937_64 &mt) -> D {
     Dual<T, N> x{URand<T>{}(mt)};
-    for (size_t i = 0; i < N; ++i) x.gradient()[i] = URand<T>{}(mt);
+    for (ptrdiff_t i = 0; i < N; ++i) x.gradient()[i] = URand<T>{}(mt);
     return x;
   }
 };
@@ -184,16 +182,16 @@ template <typename T>
 constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
                         const auto &p) {
   using S = SquareMatrix<T, L>;
-  size_t N = p.size();
+  ptrdiff_t N = p.size();
   invariant(N > 0);
-  invariant(size_t(C.numRow()), size_t(C.numCol()));
-  invariant(size_t(B.numRow()), size_t(B.numCol()));
-  invariant(size_t(B.numRow()), size_t(C.numRow()));
+  invariant(ptrdiff_t(C.numRow()), ptrdiff_t(C.numCol()));
+  invariant(ptrdiff_t(B.numRow()), ptrdiff_t(B.numCol()));
+  invariant(ptrdiff_t(B.numRow()), ptrdiff_t(C.numRow()));
   S A_{SquareDims{B.numRow()}};
   MutSquarePtrMatrix<T> A{A_};
   if (N & 1) std::swap(A, B);
   B << p[0] * C + p[1] * I;
-  for (size_t i = 2; i < N; ++i) {
+  for (ptrdiff_t i = 2; i < N; ++i) {
     std::swap(A, B);
     B << A * C + p[i] * I;
   }
@@ -201,22 +199,22 @@ constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
 
 template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   using S = decltype(extractDualValRecurse(std::declval<utils::eltype_t<T>>()));
-  size_t n = size_t(A.numRow());
+  ptrdiff_t n = ptrdiff_t(A.numRow());
   invariant(n > 0);
   Vector<S> v;
   v.resizeForOverwrite(n);
   invariant(A.numRow() > 0);
-  for (size_t j = 0; j < n; ++j)
+  for (ptrdiff_t j = 0; j < n; ++j)
     v[j] = std::abs(extractDualValRecurse(A(0, j)));
-  for (size_t i = 1; i < n; ++i)
-    for (size_t j = 0; j < n; ++j)
+  for (ptrdiff_t i = 1; i < n; ++i)
+    for (ptrdiff_t j = 0; j < n; ++j)
       v[j] += std::abs(extractDualValRecurse(A(i, j)));
   return *std::max_element(v.begin(), v.end());
 }
 
 template <typename T>
 constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
-  invariant(size_t(V.numRow()), size_t(A.numRow()));
+  invariant(ptrdiff_t(V.numRow()), ptrdiff_t(A.numRow()));
   unsigned n = unsigned(A.numRow());
   auto nA = opnorm1(A);
   SquareMatrix<T, L> A2_{A * A}, U_{SquareDims{n}};
@@ -276,7 +274,7 @@ template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
   expm(V, A);
   return V;
 }
-template <typename T> void expm(T *A, T *B, size_t N) {
+template <typename T> void expm(T *A, T *B, ptrdiff_t N) {
   expm(MutSquarePtrMatrix<T>(A, N), SquarePtrMatrix<T>(B, N));
 }
 
@@ -289,104 +287,104 @@ template <size_t N, size_t M> using DDual = Dual<Dual<double, N>, M>;
 
 extern "C" {
 void __attribute__((visibility("default")))
-expmf64(double *A, double *B, size_t N) {
+expmf64(double *A, double *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 
 void __attribute__((visibility("default")))
-expmf64d1(Dual<double, 1> *A, Dual<double, 1> *B, size_t N) {
+expmf64d1(Dual<double, 1> *A, Dual<double, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d2(Dual<double, 2> *A, Dual<double, 2> *B, size_t N) {
+expmf64d2(Dual<double, 2> *A, Dual<double, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d3(Dual<double, 3> *A, Dual<double, 3> *B, size_t N) {
+expmf64d3(Dual<double, 3> *A, Dual<double, 3> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d4(Dual<double, 4> *A, Dual<double, 4> *B, size_t N) {
+expmf64d4(Dual<double, 4> *A, Dual<double, 4> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d5(Dual<double, 5> *A, Dual<double, 5> *B, size_t N) {
+expmf64d5(Dual<double, 5> *A, Dual<double, 5> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d6(Dual<double, 6> *A, Dual<double, 6> *B, size_t N) {
+expmf64d6(Dual<double, 6> *A, Dual<double, 6> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d7(Dual<double, 7> *A, Dual<double, 7> *B, size_t N) {
+expmf64d7(Dual<double, 7> *A, Dual<double, 7> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d8(Dual<double, 8> *A, Dual<double, 8> *B, size_t N) {
+expmf64d8(Dual<double, 8> *A, Dual<double, 8> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d1d1(DDual<1, 1> *A, DDual<1, 1> *B, size_t N) {
+expmf64d1d1(DDual<1, 1> *A, DDual<1, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d1d2(DDual<1, 2> *A, DDual<1, 2> *B, size_t N) {
+expmf64d1d2(DDual<1, 2> *A, DDual<1, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d2d1(DDual<2, 1> *A, DDual<2, 1> *B, size_t N) {
+expmf64d2d1(DDual<2, 1> *A, DDual<2, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d2d2(DDual<2, 2> *A, DDual<2, 2> *B, size_t N) {
+expmf64d2d2(DDual<2, 2> *A, DDual<2, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d3d1(DDual<3, 1> *A, DDual<3, 1> *B, size_t N) {
+expmf64d3d1(DDual<3, 1> *A, DDual<3, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d3d2(DDual<3, 2> *A, DDual<3, 2> *B, size_t N) {
+expmf64d3d2(DDual<3, 2> *A, DDual<3, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d4d1(DDual<4, 1> *A, DDual<4, 1> *B, size_t N) {
+expmf64d4d1(DDual<4, 1> *A, DDual<4, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d4d2(DDual<4, 2> *A, DDual<4, 2> *B, size_t N) {
+expmf64d4d2(DDual<4, 2> *A, DDual<4, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d5d1(DDual<5, 1> *A, DDual<5, 1> *B, size_t N) {
+expmf64d5d1(DDual<5, 1> *A, DDual<5, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d5d2(DDual<5, 2> *A, DDual<5, 2> *B, size_t N) {
+expmf64d5d2(DDual<5, 2> *A, DDual<5, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d6d1(DDual<6, 1> *A, DDual<6, 1> *B, size_t N) {
+expmf64d6d1(DDual<6, 1> *A, DDual<6, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d6d2(DDual<6, 2> *A, DDual<6, 2> *B, size_t N) {
+expmf64d6d2(DDual<6, 2> *A, DDual<6, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d7d1(DDual<7, 1> *A, DDual<7, 1> *B, size_t N) {
+expmf64d7d1(DDual<7, 1> *A, DDual<7, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d7d2(DDual<7, 2> *A, DDual<7, 2> *B, size_t N) {
+expmf64d7d2(DDual<7, 2> *A, DDual<7, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d8d1(DDual<8, 1> *A, DDual<8, 1> *B, size_t N) {
+expmf64d8d1(DDual<8, 1> *A, DDual<8, 1> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 void __attribute__((visibility("default")))
-expmf64d8d2(DDual<8, 2> *A, DDual<8, 2> *B, size_t N) {
+expmf64d8d2(DDual<8, 2> *A, DDual<8, 2> *B, ptrdiff_t N) {
   expm(A, B, N);
 }
 }
