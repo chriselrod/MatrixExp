@@ -187,7 +187,7 @@ constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
   invariant(ptrdiff_t(C.numRow()), ptrdiff_t(C.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(B.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(C.numRow()));
-  S A_{SquareDims{B.numRow()}};
+  S A_{SquareDims{N == 2 ? Row{0} : B.numRow()}};
   MutSquarePtrMatrix<T> A{A_};
   if (N & 1) std::swap(A, B);
   B << p[0] * C + p[1] * I;
@@ -255,7 +255,6 @@ constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
     if (s > 0) U *= t;
     V << A6 * (182 * A6 + 960960 * A4 + 1323241920 * A2) +
            (670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2) +
-
            64764752532480000 * I;
   }
   for (auto v = V.begin(), u = U.begin(), e = V.end(); v != e; ++v, ++u) {
