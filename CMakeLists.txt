@@ -79,3 +79,13 @@ target_compile_options(
           -Wshadow
           -Wextra
           -save-temps)
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT supported OUTPUT error)
+if(supported)
+  message(STATUS "IPO / LTO enabled")
+  set_target_properties(${PROJECT_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION
+                                                   TRUE)
+else()
+  message(STATUS "IPO / LTO not supported: <${error}>")
+endif()
