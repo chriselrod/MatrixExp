@@ -131,7 +131,6 @@ function matevalpoly!(B, C, D, A::AbstractMatrix{T}, t::NTuple{2}) where {T}
   return B
 end
 
-#### Copied from StaticArrays and adapted to BorderedLowerTriangular
 function expm!(Z::AbstractMatrix, A::AbstractMatrix)
   # omitted: matrix balancing, i.e., LAPACK.gebal!
   # nA = maximum(sum(abs.(A); dims=Val(1)))    # marginally more performant than norm(A, 1)
@@ -333,7 +332,7 @@ function dualify(A, n, j)
 end
 
 const COMPILE_TIMES = zeros(Int, 4)
-for l = 1:5
+for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp` impl)
   println("Size $l x $l:")
   for j = 0:2
     for n = (j!=0):8

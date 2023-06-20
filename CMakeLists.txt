@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(MatrixExp LANGUAGES C CXX)
+project(MatrixExp LANGUAGES CXX)
 
 option(ENABLE_NATIVE_COMPILATION "Compile with -march=native" ON)
 
@@ -15,8 +15,17 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Math)
 
-add_library(MatrixExp SHARED src/MatrixExp.cpp)
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp)
+add_library(${PROJECT_NAME} SHARED ${headers} ${sources})
 target_link_libraries(MatrixExp Math)
+target_include_directories(
+  ${PROJECT_NAME}
+  PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+          $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>)
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
                                                "IntelLLVM"))
@@ -25,9 +34,14 @@ if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   target_compile_options(
     ${PROJECT_NAME}
-    PRIVATE -fmax-errors=2 -fconcepts-diagnostics-depth=4
-            -fno-semantic-interposition -fdiagnostics-color=always
-            -fverbose-asm -fweb -frename-registers -funroll-loops)
+    PRIVATE -fmax-errors=2
+            -fconcepts-diagnostics-depth=4
+            -fno-semantic-interposition
+            -fdiagnostics-color=always
+            -fverbose-asm
+            -fweb
+            -frename-registers
+            -funroll-loops)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)
@@ -43,6 +57,7 @@ if(ENABLE_NATIVE_COMPILATION)
     endif()
   endif()
 endif()
+
 set_target_properties(
   ${PROJECT_NAME}
   PROPERTIES CXX_STANDARD 20
