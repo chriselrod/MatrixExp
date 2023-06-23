@@ -78,7 +78,9 @@ target_compile_options(
           -Wall
           -Wshadow
           -Wextra
-          -save-temps)
+          -save-temps
+          -fno-unwind-tables
+          -fno-asynchronous-unwind-tables)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT supported OUTPUT error)
