@@ -30,7 +30,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
                                                "IntelLLVM"))
   target_compile_options(${PROJECT_NAME} PRIVATE -ferror-limit=2
-                                                 -fcolor-diagnostics)
+    -fcolor-diagnostics
+  -mllvm -enable-vplan-native-path)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   target_compile_options(
     ${PROJECT_NAME}
@@ -41,7 +42,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             -fverbose-asm
             -fweb
             -frename-registers
-            -funroll-loops)
+            )#-funroll-loops)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)
@@ -78,7 +79,7 @@ target_compile_options(
           -Wall
           -Wshadow
           -Wextra
-          -save-temps
+          # -save-temps
           -fno-unwind-tables
           -fno-asynchronous-unwind-tables)
 
