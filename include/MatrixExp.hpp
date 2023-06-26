@@ -274,7 +274,8 @@ template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
   expm(V, A);
   return V;
 }
-template <typename T> void expm(T *A, T *B, ptrdiff_t N) {
+template <typename T>
+void expm(T *__restrict__ A, T *__restrict__ B, ptrdiff_t N) {
   expm(MutSquarePtrMatrix<T>(A, N), SquarePtrMatrix<T>(B, N));
 }
 

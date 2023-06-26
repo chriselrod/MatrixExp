@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.23)
 project(MatrixExp LANGUAGES CXX)
 
 option(ENABLE_NATIVE_COMPILATION "Compile with -march=native" ON)
+option(ENABLE_LTO "Compile with link time optimizations" OFF)
 
 include(FetchContent)
 
@@ -30,8 +31,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
                                                "IntelLLVM"))
   target_compile_options(${PROJECT_NAME} PRIVATE -ferror-limit=2
-    -fcolor-diagnostics
-  -mllvm -enable-vplan-native-path)
+    -fcolor-diagnostics)
+  # -mllvm -enable-vplan-native-path)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   target_compile_options(
     ${PROJECT_NAME}
@@ -79,10 +80,10 @@ target_compile_options(
           -Wall
           -Wshadow
           -Wextra
-          # -save-temps
           -fno-unwind-tables
           -fno-asynchronous-unwind-tables)
 
+if(ENABLE_LTO)
 include(CheckIPOSupported)
 check_ipo_supported(RESULT supported OUTPUT error)
 if(supported)
@@ -91,4 +92,7 @@ if(supported)
                                                    TRUE)
 else()
   message(STATUS "IPO / LTO not supported: <${error}>")
+endif()
+else() # temps aren't interesting with LTO
+  target_compile_options(${PROJECT_NAME} PRIVATE -save-temps)
 endif()
