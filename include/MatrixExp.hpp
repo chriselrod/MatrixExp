@@ -15,7 +15,7 @@ namespace poly::math {
 
 template <class T, size_t N> class Dual {
   T val{};
-  SVector<T, N> partials{T{}};
+  SVector<T, N> partials{};
 
 public:
   static constexpr bool is_scalar = true;
