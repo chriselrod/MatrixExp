@@ -31,7 +31,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
                                                "IntelLLVM"))
   target_compile_options(${PROJECT_NAME} PRIVATE -ferror-limit=2
-    -fcolor-diagnostics)
+                                                 -fcolor-diagnostics)
   # -mllvm -enable-vplan-native-path)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   target_compile_options(
@@ -42,8 +42,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             -fdiagnostics-color=always
             -fverbose-asm
             -fweb
-            -frename-registers
-            )#-funroll-loops)
+            -frename-registers) # -funroll-loops)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)
@@ -84,15 +83,15 @@ target_compile_options(
           -fno-asynchronous-unwind-tables)
 
 if(ENABLE_LTO)
-include(CheckIPOSupported)
-check_ipo_supported(RESULT supported OUTPUT error)
-if(supported)
-  message(STATUS "IPO / LTO enabled")
-  set_target_properties(${PROJECT_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION
-                                                   TRUE)
-else()
-  message(STATUS "IPO / LTO not supported: <${error}>")
-endif()
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT supported OUTPUT error)
+  if(supported)
+    message(STATUS "IPO / LTO enabled")
+    set_target_properties(${PROJECT_NAME}
+                          PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+  else()
+    message(STATUS "IPO / LTO not supported: <${error}>")
+  endif()
 else() # temps aren't interesting with LTO
   target_compile_options(${PROJECT_NAME} PRIVATE -save-temps)
 endif()

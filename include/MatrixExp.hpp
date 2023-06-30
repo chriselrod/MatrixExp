@@ -1,4 +1,4 @@
-
+#pragma once
 #include <Containers/TinyVector.hpp>
 #include <Math/Array.hpp>
 #include <Math/LinearAlgebra.hpp>
@@ -15,9 +15,10 @@ namespace poly::math {
 
 template <class T, size_t N> class Dual {
   T val{};
-  SVector<T, N> partials{};
+  SVector<T, N> partials{T{}};
 
 public:
+  static constexpr bool is_scalar = true;
   using val_type = T;
   static constexpr size_t num_partials = N;
   constexpr Dual() = default;
@@ -32,7 +33,7 @@ public:
   [[nodiscard]] constexpr auto gradient() const -> const SVector<T, N> & {
     return partials;
   }
-  constexpr auto operator-() const -> Dual { return Dual(-val, -partials); }
+  constexpr auto operator-() const -> Dual { return {-val, -partials}; }
   constexpr auto operator+(const Dual &other) const -> Dual {
 
     return {val + other.val, partials + other.partials};
@@ -59,7 +60,7 @@ public:
   }
   constexpr auto operator*=(const Dual &other) -> Dual & {
     val *= other.val;
-    partials = val * other.partials + other.val * partials;
+    partials << val * other.partials + other.val * partials;
     return *this;
   }
   constexpr auto operator/=(const Dual &other) -> Dual & {
@@ -146,7 +147,7 @@ static_assert(
   utils::ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>, L>>);
 // auto x = Dual<Dual<double, 4>, 2>{1.0};
 // auto y = x * 3.4;
-
+// static_assert(Scalar<Dual<double, 4>>);
 static_assert(std::convertible_to<int, Dual<double, 4>>);
 static_assert(std::convertible_to<int, Dual<Dual<double, 4>, 2>>);
 
@@ -165,7 +166,7 @@ template <> struct URand<double> {
   }
 };
 
-constexpr auto extractDualValRecurse(const auto &x) { return x; }
+constexpr auto extractDualValRecurse(std::floating_point auto x) { return x; }
 template <class T, size_t N>
 constexpr auto extractDualValRecurse(const Dual<T, N> &x) {
   return extractDualValRecurse(x.value());
@@ -274,13 +275,11 @@ template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
   expm(V, A);
   return V;
 }
-template <typename T>
-void expm(T *__restrict__ A, T *__restrict__ B, ptrdiff_t N) {
+template <typename T> void expm(T *A, T *B, ptrdiff_t N) {
   expm(MutSquarePtrMatrix<T>(A, N), SquarePtrMatrix<T>(B, N));
 }
 
 } // namespace poly::math
 
 using poly::math::expm, poly::math::Dual;
-
 template <size_t N, size_t M> using DDual = Dual<Dual<double, N>, M>;
