@@ -131,7 +131,29 @@ function matevalpoly!(B, C, D, A::AbstractMatrix{T}, t::NTuple{2}) where {T}
   return B
 end
 
-function expm!(Z::AbstractMatrix, A::AbstractMatrix)
+naive_matmul!(C, A, B) =
+  for n in axes(C, 2), m in axes(C, 1)
+    Cmn = zero(eltype(C))
+    for k in axes(A, 2)
+      Cmn += A[m, k] * B[k, n]
+    end
+    C[m, n] = Cmn
+  end
+naive_matmuladd!(C, A, B) =
+  for n in axes(C, 2), m in axes(C, 1)
+    Cmn = zero(eltype(C))
+    for k in axes(A, 2)
+      Cmn += A[m, k] * B[k, n]
+    end
+    C[m, n] += Cmn
+  end
+
+function expm!(
+  Z::AbstractMatrix,
+  A::AbstractMatrix,
+  matmul! = naive_matmul!,
+  matmuladd! = naive_matmuladd!
+)
   # omitted: matrix balancing, i.e., LAPACK.gebal!
   # nA = maximum(sum(abs.(A); dims=Val(1)))    # marginally more performant than norm(A, 1)
   nA = opnorm(A, 1)
@@ -144,23 +166,23 @@ function expm!(Z::AbstractMatrix, A::AbstractMatrix)
     A2 = A * A
     if nA <= 0.015
       matevalpoly!(V, nothing, nothing, A2, (60, 1))
-      mul!(U, A, V)
+      matmul!(U, A, V)
       matevalpoly!(V, nothing, nothing, A2, (120, 12))
     else
       B = similar(A)
       if nA <= 0.25
         matevalpoly!(V, nothing, U, A2, (15120, 420, 1))
-        mul!(U, A, V)
+        matmul!(U, A, V)
         matevalpoly!(V, nothing, B, A2, (30240, 3360, 30))
       else
         C = similar(A)
         if nA <= 0.95
           matevalpoly!(V, C, U, A2, (8648640, 277200, 1512, 1))
-          mul!(U, A, V)
+          matmul!(U, A, V)
           matevalpoly!(V, B, C, A2, (17297280, 1995840, 25200, 56))
         else
           matevalpoly!(V, C, U, A2, (8821612800, 302702400, 2162160, 3960, 1))
-          mul!(U, A, V)
+          matmul!(U, A, V)
           matevalpoly!(
             V,
             B,
@@ -206,8 +228,8 @@ function expm!(Z::AbstractMatrix, A::AbstractMatrix)
       )
       U[m] = muladd(16380, a4, muladd(40840800, a2, a6))
     end
-    mul!(B, A6, U, 1.0, 1.0)
-    mul!(U, A, B)
+    matmuladd!(B, A6, U)
+    matmul!(U, A, B)
 
     V = s > 0 ? fill!(A, 0) : zero(A)
     @inbounds for m = 1:N
@@ -224,7 +246,7 @@ function expm!(Z::AbstractMatrix, A::AbstractMatrix)
         muladd(129060195264000, a4, muladd(7771770303897600, a2, V[m]))
       )
     end
-    mul!(V, A6, B, 1.0, 1.0)
+    matmuladd!(B, A6, U)
 
     @inbounds for m = 1:N*N
       u = U[m]
@@ -238,7 +260,7 @@ function expm!(Z::AbstractMatrix, A::AbstractMatrix)
 
     if s > 0            # squaring to reverse dividing by power of 2
       for t = 1:si
-        mul!(V, expA, expA)
+        matmul!(V, expA, expA)
         expA, V = V, expA
       end
       if Z !== expA
@@ -249,6 +271,7 @@ function expm!(Z::AbstractMatrix, A::AbstractMatrix)
   end
   expA
 end
+expm_bad!(Z, A) = expm!(Z, A, mul!, (C, A, B) -> mul!(C, A, B, 1.0, 1.0))
 
 const libMatrixExp = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")

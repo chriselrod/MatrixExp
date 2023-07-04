@@ -7,8 +7,10 @@
 #include <Utilities/Invariant.hpp>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <concepts>
 #include <cstdint>
+#include <limits>
 #include <random>
 
 namespace poly::math {
@@ -21,12 +23,16 @@ public:
   static constexpr bool is_scalar = true;
   using val_type = T;
   static constexpr size_t num_partials = N;
-  constexpr Dual() = default;
-  constexpr Dual(T v) : val(v) {}
-  constexpr Dual(T v, ptrdiff_t n) : val(v) { partials[n] = T{1}; }
-  constexpr Dual(T v, SVector<T, N> g) : val(v), partials(g) {}
-  constexpr Dual(std::integral auto v) : val(v) {}
-  constexpr Dual(std::floating_point auto v) : val(v) {}
+  // constexpr Dual() = default;
+  constexpr Dual() : val{T{}} { partials << T{}; }
+  constexpr Dual(T v) : val(v) { partials << T{}; }
+  constexpr Dual(T v, ptrdiff_t n) : val(v) {
+    partials << T{};
+    partials[n] = T{1};
+  }
+  constexpr Dual(T v, SVector<T, N> g) : val(v) { partials << g; }
+  constexpr Dual(std::integral auto v) : val(v) { partials << T{}; }
+  constexpr Dual(std::floating_point auto v) : val(v) { partials << T{}; }
   constexpr auto value() -> T & { return val; }
   constexpr auto gradient() -> SVector<T, N> & { return partials; }
   [[nodiscard]] constexpr auto value() const -> const T & { return val; }
@@ -214,6 +220,17 @@ template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   return *std::max_element(v.begin(), v.end());
 }
 
+constexpr auto exp2(int64_t x) -> double {
+  if (x > 1023) return std::numeric_limits<double>::infinity();
+  if (x <= -1023) return std::bit_cast<double>(uint64_t(1) << ((x + 1074)));
+  return std::bit_cast<double>((x + 1023) << 52);
+}
+/// computes ceil(log2(x))
+constexpr auto log2ceil(double x) -> unsigned {
+  uint64_t u = std::bit_cast<uint64_t>(x) - 1;
+  return (u >> 52) - 1022;
+}
+
 template <typename T>
 constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
   invariant(ptrdiff_t(V.numRow()), ptrdiff_t(A.numRow()));
@@ -241,10 +258,10 @@ constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
     U << A * V;
     evalpoly(V, A2, p1);
   } else {
-    s = std::max(int(std::ceil(std::log2(nA / 5.4))), 0);
+    s = std::max(log2ceil(nA / 5.4), unsigned(0));
     double t = 1.0;
     if (s > 0) {
-      t = 1.0 / std::exp2(s);
+      t = 1.0 / exp2(s);
       A2 *= (t * t);
       if (s & 1) std::swap(U, V);
     }

@@ -79,6 +79,7 @@ target_compile_options(
           -Wall
           -Wshadow
           -Wextra
+          -Werror
           -fno-unwind-tables
           -fno-asynchronous-unwind-tables)
 
