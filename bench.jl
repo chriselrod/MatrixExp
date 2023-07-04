@@ -130,6 +130,8 @@ function matevalpoly!(B, C, D, A::AbstractMatrix{T}, t::NTuple{2}) where {T}
   end
   return B
 end
+ceillog2(x::Float64) =
+  (reinterpret(Int, x) - 1) >> Base.significand_bits(Float64) - 1022
 
 naive_matmul!(C, A, B) =
   for n in axes(C, 2), m in axes(C, 1)
@@ -147,6 +149,20 @@ naive_matmuladd!(C, A, B) =
     end
     C[m, n] += Cmn
   end
+_deval(x) = x
+_deval(x::ForwardDiff.Dual) = _deval(ForwardDiff.value(x))
+
+function opnorm1(A)
+  n = _deval(zero(eltype(A)))
+  @inbounds for j in axes(A, 2)
+    s = _deval(zero(eltype(A)))
+    @fastmath for i in axes(A, 1)
+      s += abs(_deval(A[i, j]))
+    end
+    n = max(n, s)
+  end
+  return n
+end
 
 function expm!(
   Z::AbstractMatrix,
@@ -156,7 +172,7 @@ function expm!(
 )
   # omitted: matrix balancing, i.e., LAPACK.gebal!
   # nA = maximum(sum(abs.(A); dims=Val(1)))    # marginally more performant than norm(A, 1)
-  nA = opnorm(A, 1)
+  nA = opnorm1(A)
   N = LinearAlgebra.checksquare(A)
   # B and C are temporaries
   ## For sufficiently small nA, use lower order Padé-Approximations
@@ -203,9 +219,8 @@ function expm!(
     expA = U
     # expA = (V - U) \ (V + U)
   else
-    s = log2(nA / 5.4)               # power of 2 later reversed by squaring
-    if s > 0
-      si = ceil(Int, s)
+    si = ceillog2(nA / 5.4)               # power of 2 later reversed by squaring
+    if si > 0
       A = A / exp2(si)
     end
     A2 = A * A
@@ -258,8 +273,8 @@ function expm!(
     expA = U
     # expA = (V - U) \ (V + U)
 
-    if s > 0            # squaring to reverse dividing by power of 2
-      for t = 1:si
+    if si > 0            # squaring to reverse dividing by power of 2
+      for _ = 1:si
         matmul!(V, expA, expA)
         expA, V = V, expA
       end
