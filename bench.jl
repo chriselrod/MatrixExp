@@ -133,22 +133,20 @@ end
 ceillog2(x::Float64) =
   (reinterpret(Int, x) - 1) >> Base.significand_bits(Float64) - 1022
 
-naive_matmul!(C, A, B) =
-  for n in axes(C, 2), m in axes(C, 1)
-    Cmn = zero(eltype(C))
-    for k in axes(A, 2)
-      Cmn += A[m, k] * B[k, n]
-    end
-    C[m, n] = Cmn
+naive_matmul!(C, A, B) = @inbounds for n in axes(C, 2), m in axes(C, 1)
+  Cmn = zero(eltype(C))
+  for k in axes(A, 2)
+    Cmn = muladd(A[m, k], B[k, n], Cmn)
   end
-naive_matmuladd!(C, A, B) =
-  for n in axes(C, 2), m in axes(C, 1)
-    Cmn = zero(eltype(C))
-    for k in axes(A, 2)
-      Cmn += A[m, k] * B[k, n]
-    end
-    C[m, n] += Cmn
+  C[m, n] = Cmn
+end
+naive_matmuladd!(C, A, B) = @inbounds for n in axes(C, 2), m in axes(C, 1)
+  Cmn = zero(eltype(C))
+  for k in axes(A, 2)
+    Cmn = muladd(A[m, k], B[k, n], Cmn)
   end
+  C[m, n] += Cmn
+end
 _deval(x) = x
 _deval(x::ForwardDiff.Dual) = _deval(ForwardDiff.value(x))
 
@@ -246,7 +244,7 @@ function expm!(
     matmuladd!(B, A6, U)
     matmul!(U, A, B)
 
-    V = s > 0 ? fill!(A, 0) : zero(A)
+    V = si > 0 ? fill!(A, 0) : zero(A)
     @inbounds for m = 1:N
       V[m, m] = 64764752532480000
     end
@@ -261,7 +259,7 @@ function expm!(
         muladd(129060195264000, a4, muladd(7771770303897600, a2, V[m]))
       )
     end
-    matmuladd!(B, A6, U)
+    matmuladd!(V, A6, B)
 
     @inbounds for m = 1:N*N
       u = U[m]
