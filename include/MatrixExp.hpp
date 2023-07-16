@@ -38,28 +38,8 @@ public:
     return partials;
   }
   constexpr auto operator-() const & -> Dual { return {-val, -partials}; }
-  constexpr auto operator-() && -> decltype(auto) {
-    val = -val;
-    partials << -partials;
-    return std::move(*this);
-  }
   constexpr auto operator+(const Dual &other) const & -> Dual {
     return {val + other.val, partials + other.partials};
-  }
-  constexpr auto operator+(const Dual &other) && -> decltype(auto) {
-    val += other.val;
-    partials += other.partials;
-    return std::move(*this);
-  }
-  constexpr auto operator+(Dual &&other) const & -> decltype(auto) {
-    other.val += val;
-    other.partials += partials;
-    return std::move(other);
-  }
-  constexpr auto operator+(Dual &&other) && -> decltype(auto) {
-    other.val += val;
-    other.partials += partials;
-    return std::move(other);
   }
   constexpr auto operator-(const Dual &other) const -> Dual {
     return {val - other.val, partials - other.partials};
@@ -94,10 +74,6 @@ public:
   }
   constexpr auto operator+(double other) const & -> Dual {
     return {val + other, partials};
-  }
-  constexpr auto operator+(double other) && -> decltype(auto) {
-    val += other;
-    return std::move(*this);
   }
   constexpr auto operator-(double other) const -> Dual {
     return {val - other, partials};
