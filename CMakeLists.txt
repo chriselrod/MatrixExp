@@ -12,7 +12,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
-  GIT_TAG origin/main)
+  GIT_TAG origin/eve)
+  # GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
@@ -57,6 +58,22 @@ if(ENABLE_NATIVE_COMPILATION)
       target_compile_options(${PROJECT_NAME} PRIVATE -mprefer-vector-width=512)
     endif()
   endif()
+endif()
+
+include(ProcessorCount)
+ProcessorCount(N)
+if(NOT N EQUAL 0)
+  # 50 tasks
+  math(EXPR N "(${N} + 49) / ${N}")
+  message(STATUS "Using ${N} batch size")
+set_target_properties(${PROJECT_NAME} PROPERTIES
+                      UNITY_BUILD_MODE BATCH
+                      UNITY_BUILD_BATCH_SIZE N
+)
+else()
+set_target_properties(${PROJECT_NAME} PROPERTIES
+                      UNITY_BUILD_MODE BATCH
+                      UNITY_BUILD_BATCH_SIZE 0)  
 endif()
 
 set_target_properties(

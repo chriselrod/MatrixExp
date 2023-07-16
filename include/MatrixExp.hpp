@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <limits>
 #include <random>
+#include <utility>
 
 namespace poly::math {
 
@@ -36,10 +37,29 @@ public:
   [[nodiscard]] constexpr auto gradient() const -> const SVector<T, N> & {
     return partials;
   }
-  constexpr auto operator-() const -> Dual { return {-val, -partials}; }
-  constexpr auto operator+(const Dual &other) const -> Dual {
-
+  constexpr auto operator-() const & -> Dual { return {-val, -partials}; }
+  constexpr auto operator-() && -> decltype(auto) {
+    val = -val;
+    partials << -partials;
+    return std::move(*this);
+  }
+  constexpr auto operator+(const Dual &other) const & -> Dual {
     return {val + other.val, partials + other.partials};
+  }
+  constexpr auto operator+(const Dual &other) && -> decltype(auto) {
+    val += other.val;
+    partials += other.partials;
+    return std::move(*this);
+  }
+  constexpr auto operator+(Dual &&other) const & -> decltype(auto) {
+    other.val += val;
+    other.partials += partials;
+    return std::move(other);
+  }
+  constexpr auto operator+(Dual &&other) && -> decltype(auto) {
+    other.val += val;
+    other.partials += partials;
+    return std::move(other);
   }
   constexpr auto operator-(const Dual &other) const -> Dual {
     return {val - other.val, partials - other.partials};
@@ -72,8 +92,12 @@ public:
                   (other.val * other.val);
     return *this;
   }
-  constexpr auto operator+(double other) const -> Dual {
+  constexpr auto operator+(double other) const & -> Dual {
     return {val + other, partials};
+  }
+  constexpr auto operator+(double other) && -> decltype(auto) {
+    val += other;
+    return std::move(*this);
   }
   constexpr auto operator-(double other) const -> Dual {
     return {val - other, partials};
@@ -300,3 +324,8 @@ template <typename T> void expm(T *A, T *B, ptrdiff_t N) {
 
 using poly::math::expm, poly::math::Dual;
 template <size_t N, size_t M> using DDual = Dual<Dual<double, N>, M>;
+
+static_assert(
+  std::same_as<
+    double, decltype(poly::math::opnorm1(
+              std::declval<poly::math::MutSquarePtrMatrix<DDual<7, 2>>>()))>);
