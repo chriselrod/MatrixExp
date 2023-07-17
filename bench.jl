@@ -174,10 +174,11 @@ function expm!(
   N = LinearAlgebra.checksquare(A)
   # B and C are temporaries
   ## For sufficiently small nA, use lower order Padé-Approximations
+  A2 = similar(A)
+  matmul!(A2, A, A)
   if nA <= 2.1
     U = Z
     V = similar(A)
-    A2 = A * A
     if nA <= 0.015
       matevalpoly!(V, nothing, nothing, A2, (60, 1))
       matmul!(U, A, V)
@@ -221,9 +222,10 @@ function expm!(
     if si > 0
       A = A / exp2(si)
     end
-    A2 = A * A
-    A4 = A2 * A2
-    A6 = A2 * A4
+    A4 = similar(A)
+    A6 = similar(A)
+    matmul!(A4, A2, A2)
+    matmul!(A6, A2, A4)
 
     U = Z
     B = zero(A)
@@ -286,6 +288,25 @@ function expm!(
 end
 expm_bad!(Z, A) = expm!(Z, A, mul!, (C, A, B) -> mul!(C, A, B, 1.0, 1.0))
 
+d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
+function dualify(A, n, j)
+  if n > 0
+    A = d.(A, n)
+    if (j > 0)
+      A = d.(A, j)
+    end
+  end
+  A
+end
+struct ForEach{A,B,F}
+  f::F
+  a::A
+  b::B
+end
+ForEach(f, b) = ForEach(f, nothing, b)
+(f::ForEach)() = foreach(Base.Fix1(f.f, f.a), f.b)
+(f::ForEach{Nothing})() = foreach(f.f, f.b)
+
 const libMatrixExp = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
 for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
@@ -319,8 +340,6 @@ for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
   end
 end
 
-d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
-
 # macros are too awkward to work with, so we use a function
 # mean times are much better for benchmarking than minimum
 # whenever you have a function that allocates
@@ -340,6 +359,7 @@ function bmean(f)
     ")"
   )
 end
+
 #=
 struct Closure{F,A}
   f::F
@@ -348,24 +368,6 @@ end
 Closure(f, a, b...) = Closure(f, (a, b...))
 (c::Closure)() = c.f(c.a...)
 =#
-struct ForEach{A,B,F}
-  f::F
-  a::A
-  b::B
-end
-ForEach(f, b) = ForEach(f, nothing, b)
-(f::ForEach)() = foreach(Base.Fix1(f.f, f.a), f.b)
-(f::ForEach{Nothing})() = foreach(f.f, f.b)
-
-function dualify(A, n, j)
-  if n > 0
-    A = d.(A, n)
-    if (j > 0)
-      A = d.(A, j)
-    end
-  end
-  A
-end
 
 const COMPILE_TIMES = zeros(Int, 4)
 for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp` impl)
