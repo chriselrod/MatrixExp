@@ -175,8 +175,8 @@ function expm!(
   # B and C are temporaries
   ## For sufficiently small nA, use lower order Padé-Approximations
   A2 = similar(A)
-  matmul!(A2, A, A)
   if nA <= 2.1
+    matmul!(A2, A, A)
     U = Z
     V = similar(A)
     if nA <= 0.015
@@ -222,6 +222,7 @@ function expm!(
     if si > 0
       A = A / exp2(si)
     end
+    matmul!(A2, A, A)
     A4 = similar(A)
     A6 = similar(A)
     matmul!(A4, A2, A2)
