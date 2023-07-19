@@ -370,7 +370,7 @@ Closure(f, a, b...) = Closure(f, (a, b...))
 (c::Closure)() = c.f(c.a...)
 =#
 
-const COMPILE_TIMES = zeros(Int, 4)
+const COMPILE_TIMES = zeros(Int, 5)
 for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp` impl)
   println("Size $l x $l:")
   for j = 0:2
@@ -379,6 +379,7 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
       B = similar(first(As))
       C = similar(B)
       D = similar(B)
+      F = similar(B)
       for A in As
         Base.cumulative_compile_timing(true)
         tgcc_start = Base.cumulative_compile_time_ns()
@@ -396,6 +397,11 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
         Base.cumulative_compile_timing(false)
         t = Base.cumulative_compile_time_ns()[1] - t_start[1]
         Base.cumulative_compile_timing(true)
+        t_start = Base.cumulative_compile_time_ns()
+        expm_bad!(F, A)
+        Base.cumulative_compile_timing(false)
+        tbasemul = Base.cumulative_compile_time_ns()[1] - t_start[1]
+        Base.cumulative_compile_timing(true)
         t0_start = Base.cumulative_compile_time_ns()
         E = expm(A)
         Base.cumulative_compile_timing(false)
@@ -404,16 +410,20 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
         COMPILE_TIMES[2] += t
         COMPILE_TIMES[3] += tgcc
         COMPILE_TIMES[4] += tclang
+        COMPILE_TIMES[5] += tbasemul
         @test reinterpret(Float64, C) ≈
               reinterpret(Float64, B) ≈
               reinterpret(Float64, D) ≈
-              reinterpret(Float64, E)
+              reinterpret(Float64, E) ≈
+              reinterpret(Float64, F)
       end
       println("Size $l x $l, duals (n,j) = ($n,$j), T = $(eltype(B)):")
       print("Out of place Julia: ")
       bmean(ForEach(expm, As))
       print("In place     Julia: ")
       bmean(ForEach(expm!, B, As))
+      print("Using `mul!`-Julia: ")
+      bmean(ForEach(expm_bad!, B, As))
       print("Out of place GCC:   ")
       bmean(ForEach(gccexpm!, B, As))
       print("Out of place Clang: ")
@@ -426,6 +436,8 @@ println(
   (BenchmarkTools).prettytime(COMPILE_TIMES[1]),
   "\nIn place     Julia: ",
   (BenchmarkTools).prettytime(COMPILE_TIMES[2]),
+  "\nUsing `mul!` Julia: ",
+  (BenchmarkTools).prettytime(COMPILE_TIMES[5]),
   "\nOut of place GCC:   ",
   (BenchmarkTools).prettytime(COMPILE_TIMES[3]),
   "\nOut of place Clang: ",

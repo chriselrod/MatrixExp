@@ -43,7 +43,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             -fdiagnostics-color=always
             -fverbose-asm
             -fweb
-            -frename-registers) # -funroll-loops)
+            -frename-registers -funroll-loops)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)
@@ -68,7 +68,7 @@ if(NOT N EQUAL 0)
   message(STATUS "Using ${N} batch size")
 set_target_properties(${PROJECT_NAME} PROPERTIES
                       UNITY_BUILD_MODE BATCH
-                      UNITY_BUILD_BATCH_SIZE N
+                      UNITY_BUILD_BATCH_SIZE ${N}
 )
 else()
 set_target_properties(${PROJECT_NAME} PROPERTIES
