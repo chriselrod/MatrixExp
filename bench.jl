@@ -1,4 +1,4 @@
-using LinearAlgebra, Statistics, ForwardDiff, BenchmarkTools, Test
+using LinearAlgebra, Statistics, ForwardDiff, BenchmarkTools, Test, ExponentialUtilities, SimpleChains
 
 const BENCH_OPNORMS = (66.0, 33.0, 22.0, 11.0, 6.0, 3.0, 2.0, 0.5, 0.03, 0.001)
 
@@ -158,6 +158,8 @@ function opnorm1(A)
   return n
 end
 
+simplechain_matmul!(C,A,B) = SimpleChains.matmul!(C,A,B,SimpleChains.False())
+
 function expm!(
   Z::AbstractMatrix,
   A::AbstractMatrix,
@@ -285,6 +287,8 @@ function expm!(
 end
 expm_bad!(Z, A) = expm!(Z, A, mul!, (C, A, B) -> mul!(C, A, B, 1.0, 1.0))
 
+
+
 d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
 function dualify(A, n, j)
   if n > 0
@@ -304,10 +308,38 @@ ForEach(f, b) = ForEach(f, nothing, b)
 (f::ForEach)() = foreach(Base.Fix1(f.f, f.a), f.b)
 (f::ForEach{Nothing})() = foreach(f.f, f.b)
 
+function threadedwork!(f, As::AbstractVector{<:AbstractMatrix{T}}, r::AbstractArray) where {T}
+  nt = min(Threads.nthreads(), length(r))
+  acc = Matrix{T}(undef, cld(64, sizeof(T)), nt)
+  Threads.@threads for i = 1:nt
+    N = length(r)
+    start = div(N * (i - 1), nt) + 1
+    stop = div(N * i, nt)
+    x = zero(eltype(eltype(A)))
+    B = similar(first(As))
+    C = similar(B)
+    for A = As
+      for j = start:stop
+        B .= r[j] .* A
+        f(C, B)
+        x += sum(C)
+      end
+    end
+    acc[1,i] = x
+  end
+  return sum(@view(acc[1,:]))::T
+end
+
 const libMatrixExp = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
 for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
   j = Symbol(cc, :expm!)
+    @eval $j(A::Matrix{Float64}, reps::Int) = @ccall $lib.food(
+    A::Ptr{Float64},
+      size(A, 1)::Clong,
+      reps::Clong
+  )::Float64
+
   @eval $j(B::Matrix{Float64}, A::Matrix{Float64}) = @ccall $lib.expmf64(
     B::Ptr{Float64},
     A::Ptr{Float64},
@@ -356,6 +388,10 @@ function bmean(f)
     ")"
   )
 end
+function exputils!(B,A)
+  exponential!(copyto!(B,A))
+  return B
+end
 
 #=
 struct Closure{F,A}
@@ -365,8 +401,8 @@ end
 Closure(f, a, b...) = Closure(f, (a, b...))
 (c::Closure)() = c.f(c.a...)
 =#
-
-const COMPILE_TIMES = zeros(Int, 5)
+runbenchmarks=true
+const COMPILE_TIMES = zeros(Int, 6)
 for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp` impl)
   println("Size $l x $l:")
   for j = 0:2
@@ -376,6 +412,7 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
       C = similar(B)
       D = similar(B)
       F = similar(B)
+      G = similar(B)
       for A in As
         Base.cumulative_compile_timing(true)
         tgcc_start = Base.cumulative_compile_time_ns()
@@ -402,17 +439,25 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
         E = expm(A)
         Base.cumulative_compile_timing(false)
         t0 = Base.cumulative_compile_time_ns()[1] - t0_start[1]
+        Base.cumulative_compile_timing(true)
+        t0_start = Base.cumulative_compile_time_ns()
+        exputils!(G, A)
+        Base.cumulative_compile_timing(false)
+        t0_exputils = Base.cumulative_compile_time_ns()[1] - t0_start[1]
         COMPILE_TIMES[1] += t0
         COMPILE_TIMES[2] += t
         COMPILE_TIMES[3] += tgcc
         COMPILE_TIMES[4] += tclang
         COMPILE_TIMES[5] += tbasemul
+        COMPILE_TIMES[6] += t0_exputils
         @test reinterpret(Float64, C) ≈
               reinterpret(Float64, B) ≈
               reinterpret(Float64, D) ≈
               reinterpret(Float64, E) ≈
-              reinterpret(Float64, F)
+              reinterpret(Float64, F) ≈
+              reinterpret(Float64, G)
       end
+      if runbenchmarks
       println("Size $l x $l, duals (n,j) = ($n,$j), T = $(eltype(B)):")
       print("Out of place Julia: ")
       bmean(ForEach(expm, As))
@@ -420,10 +465,13 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
       bmean(ForEach(expm!, B, As))
       print("Using `mul!`-Julia: ")
       bmean(ForEach(expm_bad!, B, As))
+      print("In place exp utils: ")
+      bmean(ForEach(exputils!, B, As))
       print("Out of place GCC:   ")
       bmean(ForEach(gccexpm!, B, As))
       print("Out of place Clang: ")
-      bmean(ForEach(clangexpm!, B, As))
+        bmean(ForEach(clangexpm!, B, As))
+        end
     end
   end
 end
@@ -434,9 +482,13 @@ println(
   (BenchmarkTools).prettytime(COMPILE_TIMES[2]),
   "\nUsing `mul!` Julia: ",
   (BenchmarkTools).prettytime(COMPILE_TIMES[5]),
+  "\n`ExponentialUtilities.jl`:",
+  (BenchmarkTools).prettytime(COMPILE_TIMES[6]),
   "\nOut of place GCC:   ",
   (BenchmarkTools).prettytime(COMPILE_TIMES[3]),
   "\nOut of place Clang: ",
   (BenchmarkTools).prettytime(COMPILE_TIMES[4]),
   "\n"
 )
+
+

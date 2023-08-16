@@ -12,16 +12,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
-  # GIT_TAG origin/eve)
-  GIT_TAG origin/main)
+  GIT_TAG origin/eve)
+  # GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
 file(GLOB_RECURSE headers CONFIGURE_DEPENDS
      ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
-file(GLOB_RECURSE sources CONFIGURE_DEPENDS
-     ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp)
-add_library(${PROJECT_NAME} SHARED ${headers} ${sources})
+# file(GLOB_RECURSE sources CONFIGURE_DEPENDS
+#   ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp)
+# add_library(${PROJECT_NAME} SHARED ${headers} ${sources})
+
+add_library(${PROJECT_NAME} SHARED ${headers} ${CMAKE_CURRENT_SOURCE_DIR}/lib/expmd3d2.cpp)
+
 target_link_libraries(MatrixExp Math)
 target_include_directories( 
   ${PROJECT_NAME}
