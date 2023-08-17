@@ -13,20 +13,21 @@ FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
   GIT_TAG origin/eve)
-  # GIT_TAG origin/main)
+# GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
 file(GLOB_RECURSE headers CONFIGURE_DEPENDS
      ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
-# file(GLOB_RECURSE sources CONFIGURE_DEPENDS
-#   ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp)
-# add_library(${PROJECT_NAME} SHARED ${headers} ${sources})
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp)
+add_library(${PROJECT_NAME} SHARED ${headers} ${sources})
 
-add_library(${PROJECT_NAME} SHARED ${headers} ${CMAKE_CURRENT_SOURCE_DIR}/lib/expmd3d2.cpp)
+# add_library(${PROJECT_NAME} SHARED ${headers}
+# ${CMAKE_CURRENT_SOURCE_DIR}/lib/expmd3d2.cpp)
 
 target_link_libraries(MatrixExp Math)
-target_include_directories( 
+target_include_directories(
   ${PROJECT_NAME}
   PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
           $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>)
@@ -46,7 +47,8 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             -fdiagnostics-color=always
             -fverbose-asm
             -fweb
-            -frename-registers -funroll-loops)
+            -frename-registers
+            -funroll-loops)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)
@@ -69,14 +71,11 @@ if(NOT N EQUAL 0)
   # 50 tasks
   math(EXPR N "(${N} + 49) / ${N}")
   message(STATUS "Using ${N} batch size")
-set_target_properties(${PROJECT_NAME} PROPERTIES
-                      UNITY_BUILD_MODE BATCH
-                      UNITY_BUILD_BATCH_SIZE ${N}
-)
+  set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD_MODE BATCH
+                                                   UNITY_BUILD_BATCH_SIZE ${N})
 else()
-set_target_properties(${PROJECT_NAME} PROPERTIES
-                      UNITY_BUILD_MODE BATCH
-                      UNITY_BUILD_BATCH_SIZE 0)  
+  set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD_MODE BATCH
+                                                   UNITY_BUILD_BATCH_SIZE 0)
 endif()
 
 set_target_properties(

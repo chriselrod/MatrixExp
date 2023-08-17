@@ -20,11 +20,14 @@ template <class T, ptrdiff_t N, ptrdiff_t P = N> class Dual {
   T val{};
   SVector<T, N, P> partials{T{}};
 
+public:
+  using PaddedValues = utils::uncompressed_t<T>;
   using PaddedPartials = decltype(SVector<T, N, P>::decompress(nullptr));
   static constexpr ptrdiff_t L =
     std::remove_cvref_t<PaddedPartials>::paddedlength();
+  using PaddedDual = Dual<PaddedValues, N, L>;
+  static_assert(std::popcount(size_t(L)) == 1);
 
-public:
   static constexpr bool is_scalar = true;
   using val_type = T;
   static constexpr ptrdiff_t num_partials = N;
@@ -35,27 +38,42 @@ public:
   constexpr Dual(T v, SVector<T, N, P> g) : val(v) { partials << g; }
   constexpr Dual(std::integral auto v) : val(v) {}
   constexpr Dual(std::floating_point auto v) : val(v) {}
-  constexpr auto value() -> T & { return val; }
-  constexpr auto gradient() -> SVector<T, N, P> & { return partials; }
-  [[nodiscard]] constexpr auto value() const -> const T & { return val; }
-  [[nodiscard]] constexpr auto gradient() const -> const SVector<T, N, P> & {
-    return partials;
+  [[nodiscard]] constexpr auto value() const -> PaddedValues {
+    if constexpr (!std::same_as<T, PaddedValues>)
+      return utils::decompress(&(this->val));
+    else return val;
   }
+  [[nodiscard]] constexpr auto gradient() const {
+    return SVector<T, N, P>::decompress(&(this->partials));
+  }
+  constexpr void setvalue(T v) { val = v; }
+  constexpr void setgradient(T v, ptrdiff_t i) { partials[i] = v; }
 
-  static constexpr auto decompress(const Dual *x) -> Dual<T, N, L> {
+  static constexpr auto decompress(const Dual *x) -> PaddedDual {
     const T *v = &(x->val);
     const SVector<T, N, P> *p = &(x->partials);
     return {utils::decompress(v), SVector<T, N, P>::decompress(p)};
   }
-  static constexpr void compress(Dual *x, const Dual<T, N, L> &rhs) {
-    T *v = &(x->val);
-    SVector<T, N, P> *p = &(x->partials);
-    utils::compress(v, rhs.value());
-    SVector<T, N, P>::compress(p, rhs.gradient());
+  template <typename U, ptrdiff_t K>
+  static constexpr void compress(Dual *x, const Dual<U, N, K> &rhs) {
+    if constexpr (std::same_as<PaddedValues, U> && (K == L)) {
+      T *v = &(x->val);
+      SVector<T, N, P> *p = &(x->partials);
+      utils::compress(v, rhs.value());
+      SVector<T, N, P>::compress(p, rhs.gradient());
+    } else {
+      static_assert(std::same_as<T, U> && (K == P));
+      *x = rhs;
+    }
   }
-
+  constexpr Dual(const Dual &) = default;
+  constexpr auto operator=(const Dual &) -> Dual & = default;
+  // constexpr auto operator=(const PaddedDual &x) -> Dual & {
+  //   compress(this, x);
+  // }
   constexpr auto operator-() const & -> Dual { return {-val, -partials}; }
   constexpr auto operator+(const Dual &other) const & -> Dual {
+    static_assert(std::popcount(size_t(P)) == 1);
     return {val + other.val, partials + other.partials};
   }
   constexpr auto operator-(const Dual &other) const -> Dual {
