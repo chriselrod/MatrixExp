@@ -1,6 +1,7 @@
 #pragma once
 #include <Containers/TinyVector.hpp>
 #include <Math/Array.hpp>
+#include <Math/Dual.hpp>
 #include <Math/LinearAlgebra.hpp>
 #include <Math/Matrix.hpp>
 #include <Math/StaticArrays.hpp>
@@ -16,135 +17,6 @@
 
 namespace poly::math {
 
-template <class T, size_t N> class Dual {
-  T val{};
-  SVector<T, N> partials{T{}};
-
-public:
-  static constexpr bool is_scalar = true;
-  using val_type = T;
-  static constexpr size_t num_partials = N;
-  // constexpr Dual() = default;
-  constexpr Dual() = default;
-  constexpr Dual(T v) : val(v) {}
-  constexpr Dual(T v, ptrdiff_t n) : val(v) { partials[n] = T{1}; }
-  constexpr Dual(T v, SVector<T, N> g) : val(v) { partials << g; }
-  constexpr Dual(std::integral auto v) : val(v) {}
-  constexpr Dual(std::floating_point auto v) : val(v) {}
-  constexpr auto value() -> T & { return val; }
-  constexpr auto gradient() -> SVector<T, N> & { return partials; }
-  [[nodiscard]] constexpr auto value() const -> const T & { return val; }
-  [[nodiscard]] constexpr auto gradient() const -> const SVector<T, N> & {
-    return partials;
-  }
-  constexpr auto operator-() const & -> Dual { return {-val, -partials}; }
-  constexpr auto operator+(const Dual &other) const & -> Dual {
-    return {val + other.val, partials + other.partials};
-  }
-  constexpr auto operator-(const Dual &other) const -> Dual {
-    return {val - other.val, partials - other.partials};
-  }
-  constexpr auto operator*(const Dual &other) const -> Dual {
-    return {val * other.val, val * other.partials + other.val * partials};
-  }
-  constexpr auto operator/(const Dual &other) const -> Dual {
-    return {val / other.val, (other.val * partials - val * other.partials) /
-                               (other.val * other.val)};
-  }
-  constexpr auto operator+=(const Dual &other) -> Dual & {
-    val += other.val;
-    partials += other.partials;
-    return *this;
-  }
-  constexpr auto operator-=(const Dual &other) -> Dual & {
-    val -= other.val;
-    partials -= other.partials;
-    return *this;
-  }
-  constexpr auto operator*=(const Dual &other) -> Dual & {
-    val *= other.val;
-    partials << val * other.partials + other.val * partials;
-    return *this;
-  }
-  constexpr auto operator/=(const Dual &other) -> Dual & {
-    val /= other.val;
-    partials << (other.val * partials - val * other.partials) /
-                  (other.val * other.val);
-    return *this;
-  }
-  constexpr auto operator+(double other) const & -> Dual {
-    return {val + other, partials};
-  }
-  constexpr auto operator-(double other) const -> Dual {
-    return {val - other, partials};
-  }
-  constexpr auto operator*(double other) const -> Dual {
-    return {val * other, other * partials};
-  }
-  constexpr auto operator/(double other) const -> Dual {
-    return {val / other, partials / other};
-  }
-  constexpr auto operator+=(double other) -> Dual & {
-    val += other;
-    return *this;
-  }
-  constexpr auto operator-=(double other) -> Dual & {
-    val -= other;
-    return *this;
-  }
-  constexpr auto operator*=(double other) -> Dual & {
-    val *= other;
-    partials *= other;
-    return *this;
-  }
-  constexpr auto operator/=(double other) -> Dual & {
-    val /= other;
-    partials /= other;
-    return *this;
-  }
-  constexpr auto operator==(const Dual &other) const -> bool {
-    return val == other.val; // && grad == other.grad;
-  }
-  constexpr auto operator!=(const Dual &other) const -> bool {
-    return val != other.val; // || grad != other.grad;
-  }
-  constexpr auto operator==(double other) const -> bool { return val == other; }
-  constexpr auto operator!=(double other) const -> bool { return val != other; }
-  constexpr auto operator<(double other) const -> bool { return val < other; }
-  constexpr auto operator>(double other) const -> bool { return val > other; }
-  constexpr auto operator<=(double other) const -> bool { return val <= other; }
-  constexpr auto operator>=(double other) const -> bool { return val >= other; }
-  constexpr auto operator<(const Dual &other) const -> bool {
-    return val < other.val;
-  }
-  constexpr auto operator>(const Dual &other) const -> bool {
-    return val > other.val;
-  }
-  constexpr auto operator<=(const Dual &other) const -> bool {
-    return val <= other.val;
-  }
-  constexpr auto operator>=(const Dual &other) const -> bool {
-    return val >= other.val;
-  }
-};
-template <class T, size_t N> Dual(T, SVector<T, N>) -> Dual<T, N>;
-
-template <class T, size_t N>
-constexpr auto operator+(double other, Dual<T, N> x) -> Dual<T, N> {
-  return {x.value() + other, x.gradient()};
-}
-template <class T, size_t N>
-constexpr auto operator-(double other, Dual<T, N> x) -> Dual<T, N> {
-  return {x.value() - other, -x.gradient()};
-}
-template <class T, size_t N>
-constexpr auto operator*(double other, Dual<T, N> x) -> Dual<T, N> {
-  return {x.value() * other, other * x.gradient()};
-}
-template <class T, size_t N>
-constexpr auto operator/(double other, Dual<T, N> x) -> Dual<T, N> {
-  return {other / x.value(), -other * x.gradient() / (x.value() * x.value())};
-}
 constexpr size_t L = 16;
 static_assert(
   utils::ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>, L>>);
@@ -169,11 +41,6 @@ template <> struct URand<double> {
   }
 };
 
-constexpr auto extractDualValRecurse(std::floating_point auto x) { return x; }
-template <class T, size_t N>
-constexpr auto extractDualValRecurse(const Dual<T, N> &x) {
-  return extractDualValRecurse(x.value());
-}
 template <typename T>
 constexpr auto evalpoly(MutSquarePtrMatrix<T> C, const auto &p) {
   using U = utils::eltype_t<T>;
@@ -217,11 +84,6 @@ template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   return *std::max_element(v.begin(), v.end());
 }
 
-constexpr auto exp2(int64_t x) -> double {
-  if (x > 1023) return std::numeric_limits<double>::infinity();
-  if (x <= -1023) return std::bit_cast<double>(uint64_t(1) << ((x + 1074)));
-  return std::bit_cast<double>((x + 1023) << 52);
-}
 /// computes ceil(log2(x)) for x >= 1
 constexpr auto log2ceil(double x) -> unsigned {
   invariant(x >= 1);

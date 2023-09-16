@@ -1,4 +1,4 @@
-using LinearAlgebra, Statistics, ForwardDiff, BenchmarkTools, Test, ExponentialUtilities, SimpleChains
+using LinearAlgebra, Statistics, ForwardDiff, StaticArrays, BenchmarkTools, Test, ExponentialUtilities
 
 const BENCH_OPNORMS = (66.0, 33.0, 22.0, 11.0, 6.0, 3.0, 2.0, 0.5, 0.03, 0.001)
 
@@ -158,8 +158,6 @@ function opnorm1(A)
   return n
 end
 
-simplechain_matmul!(C,A,B) = SimpleChains.matmul!(C,A,B,SimpleChains.False())
-
 function expm!(
   Z::AbstractMatrix,
   A::AbstractMatrix,
@@ -308,27 +306,60 @@ ForEach(f, b) = ForEach(f, nothing, b)
 (f::ForEach)() = foreach(Base.Fix1(f.f, f.a), f.b)
 (f::ForEach{Nothing})() = foreach(f.f, f.b)
 
-function threadedwork!(f, As::AbstractVector{<:AbstractMatrix{T}}, r::AbstractArray) where {T}
-  nt = min(Threads.nthreads(), length(r))
-  acc = Matrix{T}(undef, cld(64, sizeof(T)), nt)
-  Threads.@threads for i = 1:nt
+
+function localwork!(f::F, acc::Ptr{T}, As::NTuple{<:Any,<:AbstractMatrix{T}}, r, i, nt) where {F,T}
     N = length(r)
     start = div(N * (i - 1), nt) + 1
     stop = div(N * i, nt)
-    x = zero(eltype(eltype(A)))
+    x::T = zero(T)
     B = similar(first(As))
     C = similar(B)
     for A = As
-      for j = start:stop
-        B .= r[j] .* A
-        f(C, B)
-        x += sum(C)
-      end
+        for j = start:stop
+            B .= r[j] .* A
+            f(C, B)
+            x += sum(C)
+        end
     end
-    acc[1,i] = x
-  end
-  return sum(@view(acc[1,:]))::T
+    unsafe_store!(acc, x)
 end
+
+function threadedwork!(f::F, As::NTuple{<:Any,<:AbstractMatrix{T}}, r::AbstractArray) where {T,F}
+  nt = min(Threads.nthreads(), length(r))
+    if nt <= 1
+        s = MMatrix{1,1,T}(undef)
+        GC.@preserve s localwork!(f, pointer(s), As, r, 1, 1)
+        return (s[1,1])::T;
+    end
+    x = cld(64, sizeof(T))
+    acc = Matrix{T}(undef, x, nt)
+    GC.@preserve acc begin
+        p = pointer(acc)
+        xst = sizeof(T)*x
+        Threads.@threads for i = 1:nt
+            localwork!(f, p + xst*(i-1), As, r, i, nt)
+        end
+    end
+    return sum(@view(acc[1,:]))::T
+end
+function isoutofplace(f, ::Val{NTuple{N,A}}) where {N,A}
+    Base.promote_op(f, A) !== Union{}
+end
+struct ThreadedForEach{A,F}
+  f::F
+  a::A
+end
+ThreadedForEach(f, _, b) = ThreadedForEach(f, b)
+function (f::ThreadedForEach{A})() where {A}
+    r = 0.1:0.01:10.0
+    if isoutofplace(f.f, Val(A))
+        threadedwork!((x,y) -> copyto!(x, f.f(y)), f.a, r)
+    else
+        threadedwork!(f.f, f.a, r)
+    end
+end
+
+
 
 const libMatrixExp = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
@@ -457,21 +488,22 @@ for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp`
               reinterpret(Float64, F) ≈
               reinterpret(Float64, G)
       end
-      if runbenchmarks
+        if runbenchmarks
+            FE = Threads.nthreads() > 1 ? ThreadedForEach : ForEach
       println("Size $l x $l, duals (n,j) = ($n,$j), T = $(eltype(B)):")
       print("Out of place Julia: ")
-      bmean(ForEach(expm, As))
+      bmean(FE(expm, As))
       print("In place     Julia: ")
-      bmean(ForEach(expm!, B, As))
+      bmean(FE(expm!, B, As))
       print("Using `mul!`-Julia: ")
-      bmean(ForEach(expm_bad!, B, As))
+      bmean(FE(expm_bad!, B, As))
       print("In place exp utils: ")
-      bmean(ForEach(exputils!, B, As))
+      bmean(FE(exputils!, B, As))
       print("Out of place GCC:   ")
-      bmean(ForEach(gccexpm!, B, As))
+      bmean(FE(gccexpm!, B, As))
       print("Out of place Clang: ")
-        bmean(ForEach(clangexpm!, B, As))
-        end
+      bmean(FE(clangexpm!, B, As))
+      end
     end
   end
 end
