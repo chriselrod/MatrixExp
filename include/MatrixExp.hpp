@@ -7,11 +7,8 @@
 #include <Math/StaticArrays.hpp>
 #include <Utilities/Invariant.hpp>
 #include <algorithm>
-#include <array>
 #include <bit>
-#include <concepts>
 #include <cstdint>
-#include <limits>
 #include <random>
 #include <utility>
 
@@ -59,8 +56,8 @@ constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
   invariant(ptrdiff_t(C.numRow()), ptrdiff_t(C.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(B.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(C.numRow()));
-  S A_{SquareDims{N == 2 ? Row{0} : B.numRow()}};
-  MutSquarePtrMatrix<T> A{A_};
+  S D{SquareDims{N == 2 ? Row{0} : B.numRow()}};
+  MutSquarePtrMatrix<T> A{D};
   if (N & 1) std::swap(A, B);
   B << p[0] * C + p[1] * I;
   for (ptrdiff_t i = 2; i < N; ++i) {
@@ -96,8 +93,8 @@ constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
   invariant(ptrdiff_t(V.numRow()), ptrdiff_t(A.numRow()));
   unsigned n = unsigned(A.numRow());
   auto nA = opnorm1(A);
-  SquareMatrix<T, L> A2_{A * A}, U_{SquareDims{n}};
-  MutSquarePtrMatrix<T> A2{A2_}, U{U_};
+  SquareMatrix<T, L> squaredA{A * A}, Utp{SquareDims{n}};
+  MutSquarePtrMatrix<T> AA{squaredA}, U{Utp};
   unsigned int s = 0;
   if (nA <= 2.1) {
     containers::TinyVector<double, 5> p0, p1;
@@ -114,28 +111,27 @@ constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
       p0 = {1.0, 60.0};
       p1 = {12.0, 120.0};
     }
-    evalpoly(V, A2, p0);
+    evalpoly(V, AA, p0);
     U << A * V;
-    evalpoly(V, A2, p1);
+    evalpoly(V, AA, p1);
   } else {
     // s = std::max(unsigned(std::ceil(std::log2(nA / 5.4))), unsigned(0));
     s = nA > 5.4 ? log2ceil(nA / 5.4) : unsigned(0);
     double t = 1.0;
     if (s > 0) {
-      // t = 1.0 / std::exp2(s);
       t = 1.0 / exp2(s);
-      A2 *= (t * t);
+      AA *= (t * t);
       if (s & 1) std::swap(U, V);
     }
-    SquareMatrix<T, L> A4{A2 * A2}, A6{A2 * A4};
+    SquareMatrix<T, L> A4{AA * AA}, A6{AA * A4};
 
-    V << A6 * (A6 + 16380 * A4 + 40840800 * A2) +
-           (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2) +
+    V << A6 * (A6 + 16380 * A4 + 40840800 * AA) +
+           (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * AA) +
            32382376266240000 * I;
     U << A * V;
     if (s > 0) U *= t;
-    V << A6 * (182 * A6 + 960960 * A4 + 1323241920 * A2) +
-           (670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2) +
+    V << A6 * (182 * A6 + 960960 * A4 + 1323241920 * AA) +
+           (670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * AA) +
            64764752532480000 * I;
   }
   for (auto v = V.begin(), u = U.begin(), e = V.end(); v != e; ++v, ++u) {
