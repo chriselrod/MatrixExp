@@ -78,7 +78,7 @@ endif()
 
 set_target_properties(
   ${PROJECT_NAME}
-  PROPERTIES CXX_STANDARD 20
+  PROPERTIES CXX_STANDARD 23
              CXX_VISIBILITY_PRESET hidden
              VISIBILITY_INLINES_HIDDEN ON)
 target_compile_options(
@@ -99,6 +99,15 @@ target_compile_options(
           -Werror
           -fno-unwind-tables
           -fno-asynchronous-unwind-tables)
+
+# target_precompile_headers(${PROJECT_NAME}
+#   PUBLIC
+#   include/MatrixExp.hpp
+# PRIVATE
+#   <Math/Dual.hpp>
+#   <Math/LinearAlgebra.hpp>
+#   <Math/StaticArrays.hpp>
+#   <Containers/TinyVector.hpp>)
 
 if(ENABLE_LTO)
   include(CheckIPOSupported)

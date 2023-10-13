@@ -1,4 +1,4 @@
-using LinearAlgebra, Statistics, ForwardDiff, StaticArrays, BenchmarkTools, Test, ExponentialUtilities
+using LinearAlgebra, Statistics, ForwardDiff, BenchmarkTools, Test, ExponentialUtilities
 
 const BENCH_OPNORMS = (66.0, 33.0, 22.0, 11.0, 6.0, 3.0, 2.0, 0.5, 0.03, 0.001)
 

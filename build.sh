@@ -3,7 +3,7 @@ if [ ! -d "buildgcc" ]; then
     CXX=g++ cmake -S . -B buildgcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON
 fi
 if [ ! -d "buildclang" ]; then
-    CXX=/usr/bin/clang++ cmake -S . -B buildclang -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON
+    CXX=clang++ cmake -S . -B buildclang -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON
 fi
 time cmake --build buildgcc &
 time cmake --build buildclang &

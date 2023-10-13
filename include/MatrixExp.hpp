@@ -74,10 +74,10 @@ template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   v.resizeForOverwrite(n);
   invariant(A.numRow() > 0);
   for (ptrdiff_t j = 0; j < n; ++j)
-    v[j] = std::abs(extractDualValRecurse(A(0, j)));
+    v[j] = std::abs(extractDualValRecurse(A[0, j]));
   for (ptrdiff_t i = 1; i < n; ++i)
     for (ptrdiff_t j = 0; j < n; ++j)
-      v[j] += std::abs(extractDualValRecurse(A(i, j)));
+      v[j] += std::abs(extractDualValRecurse(A[i, j]));
   return *std::max_element(v.begin(), v.end());
 }
 
