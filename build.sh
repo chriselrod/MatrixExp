@@ -1,10 +1,10 @@
 #!/bin/sh
-if [ ! -d "buildgcc" ]; then
+# if [ ! -d "buildgcc" ]; then
     CXX=g++ cmake -S . -B buildgcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON
-fi
-if [ ! -d "buildclang" ]; then
+# fi
+# if [ ! -d "buildclang" ]; then
     CXX=clang++ cmake -S . -B buildclang -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON
-fi
-time cmake --build buildgcc &
-time cmake --build buildclang &
-wait
+# fi
+time cmake --build buildgcc
+time cmake --build buildclang
+

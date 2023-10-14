@@ -1,4 +1,5 @@
-using LinearAlgebra, Statistics, ForwardDiff, BenchmarkTools, Test, ExponentialUtilities
+using LinearAlgebra,
+  Statistics, ForwardDiff, BenchmarkTools, ExponentialUtilities
 
 const BENCH_OPNORMS = (66.0, 33.0, 22.0, 11.0, 6.0, 3.0, 2.0, 0.5, 0.03, 0.001)
 
@@ -85,8 +86,8 @@ function expm(A::AbstractMatrix{S}) where {S}
   end
   expA
 end
-
-function _matevalpoly!(B, C, D, A::AbstractMatrix{T}, t::NTuple{1}) where {T}
+expm_oop!(B, A) = copyto!(B, expm(A))
+function _matevalpoly!(B, _, D, A::AbstractMatrix{T}, t::NTuple{1}) where {T}
   M = size(A, 1)
   te = T(last(t))
   @inbounds for n = 1:M, m = 1:M
@@ -117,7 +118,7 @@ function matevalpoly!(B, C, D, A::AbstractMatrix{T}, t::NTuple) where {T}
   end
   _matevalpoly!(B, C, D, A, Base.front(t1))
 end
-function matevalpoly!(B, C, D, A::AbstractMatrix{T}, t::NTuple{2}) where {T}
+function matevalpoly!(B, _, _, A::AbstractMatrix{T}, t::NTuple{2}) where {T}
   t1 = Base.front(t)
   te = T(last(t))
   tp = T(last(t1))
@@ -129,20 +130,6 @@ end
 ceillog2(x::Float64) =
   (reinterpret(Int, x) - 1) >> Base.significand_bits(Float64) - 1022
 
-naive_matmul!(C, A, B) = @inbounds for n in axes(C, 2), m in axes(C, 1)
-  Cmn = zero(eltype(C))
-  for k in axes(A, 2)
-    Cmn = muladd(A[m, k], B[k, n], Cmn)
-  end
-  C[m, n] = Cmn
-end
-naive_matmuladd!(C, A, B) = @inbounds for n in axes(C, 2), m in axes(C, 1)
-  Cmn = zero(eltype(C))
-  for k in axes(A, 2)
-    Cmn = muladd(A[m, k], B[k, n], Cmn)
-  end
-  C[m, n] += Cmn
-end
 _deval(x) = x
 _deval(x::ForwardDiff.Dual) = _deval(ForwardDiff.value(x))
 
@@ -161,8 +148,8 @@ end
 function expm!(
   Z::AbstractMatrix,
   A::AbstractMatrix,
-  matmul! = naive_matmul!,
-  matmuladd! = naive_matmuladd!
+  matmul! = mul!,
+  matmuladd! = (C, A, B) -> mul!(C, A, B, 1.0, 1.0)
 )
   # omitted: matrix balancing, i.e., LAPACK.gebal!
   # nA = maximum(sum(abs.(A); dims=Val(1)))    # marginally more performant than norm(A, 1)
@@ -283,10 +270,21 @@ function expm!(
   end
   expA
 end
-expm_bad!(Z, A) = expm!(Z, A, mul!, (C, A, B) -> mul!(C, A, B, 1.0, 1.0))
-
-
-
+naive_matmul!(C, A, B) = @inbounds for n in axes(C, 2), m in axes(C, 1)
+  Cmn = zero(eltype(C))
+  for k in axes(A, 2)
+    Cmn = muladd(A[m, k], B[k, n], Cmn)
+  end
+  C[m, n] = Cmn
+end
+naive_matmuladd!(C, A, B) = @inbounds for n in axes(C, 2), m in axes(C, 1)
+  Cmn = zero(eltype(C))
+  for k in axes(A, 2)
+    Cmn = muladd(A[m, k], B[k, n], Cmn)
+  end
+  C[m, n] += Cmn
+end
+expm_naivematmul!(Z, A) = expm!(Z, A, naive_matmul!, naive_matmuladd!)
 d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
 function dualify(A, n, j)
   if n > 0
@@ -306,44 +304,61 @@ ForEach(f, b) = ForEach(f, nothing, b)
 (f::ForEach)() = foreach(Base.Fix1(f.f, f.a), f.b)
 (f::ForEach{Nothing})() = foreach(f.f, f.b)
 
-
-function localwork!(f::F, acc::Ptr{T}, As::NTuple{<:Any,<:AbstractMatrix{T}}, r, i, nt) where {F,T}
-    N = length(r)
-    start = div(N * (i - 1), nt) + 1
-    stop = div(N * i, nt)
-    x::T = zero(T)
-    B = similar(first(As))
-    C = similar(B)
-    for A = As
-        for j = start:stop
-            B .= r[j] .* A
-            f(C, B)
-            x += sum(C)
-        end
+function localwork(
+  f::F,
+  As::NTuple{<:Any,<:AbstractMatrix{T}},
+  r,
+  i,
+  nt
+) where {F,T}
+  N = length(r)
+  start = div(N * (i - 1), nt) + 1
+  stop = div(N * i, nt)
+  x::T = zero(T)
+  B = similar(first(As))
+  C = similar(B)
+  for A in As
+    for j = start:stop
+      B .= r[j] .* A
+      f(C, B)
+      x += sum(C)
     end
-    unsafe_store!(acc, x)
+  end
+  return x
 end
-
-function threadedwork!(f::F, As::NTuple{<:Any,<:AbstractMatrix{T}}, r::AbstractArray) where {T,F}
+function localwork!(
+  f::F,
+  acc::Ptr{T},
+  As::NTuple{<:Any,<:AbstractMatrix{T}},
+  r,
+  i,
+  nt
+) where {F,T}
+  x = localwork(f, As, r, i, nt)
+  unsafe_store!(acc, x)
+end
+function threadedwork!(
+  f::F,
+  As::NTuple{<:Any,<:AbstractMatrix{T}},
+  r::AbstractArray
+) where {T,F}
   nt = min(Threads.nthreads(), length(r))
-    if nt <= 1
-        s = MMatrix{1,1,T}(undef)
-        GC.@preserve s localwork!(f, pointer(s), As, r, 1, 1)
-        return (s[1,1])::T;
+  if nt <= 1
+    return localwork(f, As, r, 1, 1)
+  end
+  x = cld(64, sizeof(T))
+  acc = Matrix{T}(undef, x, nt)
+  GC.@preserve acc begin
+    p = pointer(acc)
+    xst = sizeof(T) * x
+    Threads.@threads for i = 1:nt
+      localwork!(f, p + xst * (i - 1), As, r, i, nt)
     end
-    x = cld(64, sizeof(T))
-    acc = Matrix{T}(undef, x, nt)
-    GC.@preserve acc begin
-        p = pointer(acc)
-        xst = sizeof(T)*x
-        Threads.@threads for i = 1:nt
-            localwork!(f, p + xst*(i-1), As, r, i, nt)
-        end
-    end
-    return sum(@view(acc[1,:]))::T
+  end
+  return sum(@view(acc[1, :]))::T
 end
 function isoutofplace(f, ::Val{NTuple{N,A}}) where {N,A}
-    Base.promote_op(f, A) !== Union{}
+  Base.promote_op(f, A) !== Union{}
 end
 struct ThreadedForEach{A,F}
   f::F
@@ -351,25 +366,20 @@ struct ThreadedForEach{A,F}
 end
 ThreadedForEach(f, _, b) = ThreadedForEach(f, b)
 function (f::ThreadedForEach{A})() where {A}
-    r = 0.1:0.01:10.0
-    if isoutofplace(f.f, Val(A))
-        threadedwork!((x,y) -> copyto!(x, f.f(y)), f.a, r)
-    else
-        threadedwork!(f.f, f.a, r)
-    end
+  r = 0.1:0.01:10.0
+  if isoutofplace(f.f, Val(A))
+    threadedwork!((x, y) -> copyto!(x, f.f(y)), f.a, r)
+  else
+    threadedwork!(f.f, f.a, r)
+  end
 end
-
-
 
 const libMatrixExp = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
 for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
   j = Symbol(cc, :expm!)
-    @eval $j(A::Matrix{Float64}, reps::Int) = @ccall $lib.food(
-    A::Ptr{Float64},
-      size(A, 1)::Clong,
-      reps::Clong
-  )::Float64
+  @eval $j(A::Matrix{Float64}, reps::Int) =
+    @ccall $lib.food(A::Ptr{Float64}, size(A, 1)::Clong, reps::Clong)::Float64
 
   @eval $j(B::Matrix{Float64}, A::Matrix{Float64}) = @ccall $lib.expmf64(
     B::Ptr{Float64},
@@ -400,127 +410,103 @@ for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
   end
 end
 
-# macros are too awkward to work with, so we use a function
-# mean times are much better for benchmarking than minimum
-# whenever you have a function that allocates
-function bmean(f)
-  b = @benchmark $f()
-  m = BenchmarkTools.mean(b)
-  a = BenchmarkTools.allocs(m)
+struct BMean
+  t::Float64
+  m::Float64
+  a::Float64
+end
+BMean() = BMean(0.0, 0.0, 0.0)
+Base.zero(::BMean) = BMean()
+BMean(b::BenchmarkTools.Trial) = BMean(BenchmarkTools.mean(b))
+function BMean(b::BenchmarkTools.TrialEstimate)
+  a = BenchmarkTools.allocs(b)
+  BMean(BenchmarkTools.time(b), BenchmarkTools.memory(b), a)
+end
+Base.:(+)(x::BMean, y::BMean) = BMean(x.t+y.t,x.m+y.m,x.a+y.a)
+Base.:(/)(x::BMean, y::Number) = BMean(x.t/y,x.m/y,x.a/y)
+get_time(b::BMean) = b.t
+function Base.show(io::IO, ::MIME"text/plain", b::BMean)
+  (; t, m, a) = b
   println(
+    io,
     "  ",
-    (BenchmarkTools).prettytime((BenchmarkTools).time(m)),
+    BenchmarkTools.prettytime(t),
     " (",
     a,
     " allocation",
     (a == 1 ? "" : "s"),
     ": ",
-    (BenchmarkTools).prettymemory((BenchmarkTools).memory(m)),
+    BenchmarkTools.prettymemory(m),
     ")"
   )
 end
-function exputils!(B,A)
-  exponential!(copyto!(B,A))
+
+# macros are too awkward to work with, so we use a function
+# mean times are much better for benchmarking than minimum
+# whenever you have a function that allocates
+function bmean(f)
+  b = @benchmark $f()
+  BMean(b)
+end
+function exputils!(B, A)
+  exponential!(copyto!(B, A))
   return B
 end
 
-#=
-struct Closure{F,A}
-  f::F
-  a::A
-end
-Closure(f, a, b...) = Closure(f, (a, b...))
-(c::Closure)() = c.f(c.a...)
-=#
-runbenchmarks=true
-const COMPILE_TIMES = zeros(Int, 6)
-for l = 2:5 # silly to start with 1x1 matrices (should be special cased in `exp` impl)
-  println("Size $l x $l:")
-  for j = 0:2
-    for n = (j!=0):8
-      As = map(x -> dualify(x, n, j), randmatrices(l))
-      B = similar(first(As))
-      C = similar(B)
-      D = similar(B)
-      F = similar(B)
-      G = similar(B)
-      for A in As
-        Base.cumulative_compile_timing(true)
-        tgcc_start = Base.cumulative_compile_time_ns()
-        gccexpm!(B, A)
-        Base.cumulative_compile_timing(false)
-        tgcc = Base.cumulative_compile_time_ns()[1] - tgcc_start[1]
-        Base.cumulative_compile_timing(true)
-        tclang_start = Base.cumulative_compile_time_ns()
-        clangexpm!(D, A)
-        Base.cumulative_compile_timing(false)
-        tclang = Base.cumulative_compile_time_ns()[1] - tclang_start[1]
-        Base.cumulative_compile_timing(true)
-        t_start = Base.cumulative_compile_time_ns()
-        expm!(C, A)
-        Base.cumulative_compile_timing(false)
-        t = Base.cumulative_compile_time_ns()[1] - t_start[1]
-        Base.cumulative_compile_timing(true)
-        t_start = Base.cumulative_compile_time_ns()
-        expm_bad!(F, A)
-        Base.cumulative_compile_timing(false)
-        tbasemul = Base.cumulative_compile_time_ns()[1] - t_start[1]
-        Base.cumulative_compile_timing(true)
-        t0_start = Base.cumulative_compile_time_ns()
-        E = expm(A)
-        Base.cumulative_compile_timing(false)
-        t0 = Base.cumulative_compile_time_ns()[1] - t0_start[1]
-        Base.cumulative_compile_timing(true)
-        t0_start = Base.cumulative_compile_time_ns()
-        exputils!(G, A)
-        Base.cumulative_compile_timing(false)
-        t0_exputils = Base.cumulative_compile_time_ns()[1] - t0_start[1]
-        COMPILE_TIMES[1] += t0
-        COMPILE_TIMES[2] += t
-        COMPILE_TIMES[3] += tgcc
-        COMPILE_TIMES[4] += tclang
-        COMPILE_TIMES[5] += tbasemul
-        COMPILE_TIMES[6] += t0_exputils
-        @test reinterpret(Float64, C) ≈
-              reinterpret(Float64, B) ≈
-              reinterpret(Float64, D) ≈
-              reinterpret(Float64, E) ≈
-              reinterpret(Float64, F) ≈
-              reinterpret(Float64, G)
-      end
-        if runbenchmarks
-            FE = Threads.nthreads() > 1 ? ThreadedForEach : ForEach
-      println("Size $l x $l, duals (n,j) = ($n,$j), T = $(eltype(B)):")
-      print("Out of place Julia: ")
-      bmean(FE(expm, As))
-      print("In place     Julia: ")
-      bmean(FE(expm!, B, As))
-      print("Using `mul!`-Julia: ")
-      bmean(FE(expm_bad!, B, As))
-      print("In place exp utils: ")
-      bmean(FE(exputils!, B, As))
-      print("Out of place GCC:   ")
-      bmean(FE(gccexpm!, B, As))
-      print("Out of place Clang: ")
-      bmean(FE(clangexpm!, B, As))
+function run_benchmarks(funs, sizes = 2:8, D0 = 0:8, D1 = 0:2)
+  num_funs = length(funs)
+  compile_times = zeros(Int, num_funs)
+  brs = Array{BMean}(undef, num_funs, length(sizes), length(D0), length(D1))
+  counter = 0
+  max_count = length(sizes) * (length(D0) * length(D1) - (length(D1) - 1))
+  for (i, dim) in enumerate(sizes)
+    for (j, d1) in enumerate(D1)
+      for (k, d0) in enumerate(D0)
+        if d0 == 0 && d1 != 0
+          fill!(@view(brs[:, i, k, j]), BMean())
+          continue
+        end
+        As = map(x -> dualify(x, d0, d1), randmatrices(dim))
+        Bs = [similar(first(As)) for _ in eachindex(funs)]
+        for A in As
+          for l in eachindex(funs)
+            fun! = funs[l]
+            B = Bs[l]
+            Base.cumulative_compile_timing(true)
+            tstart = Base.cumulative_compile_time_ns()
+            fun!(B, A)
+            Base.cumulative_compile_timing(false)
+            compile_times[l] += Base.cumulative_compile_time_ns()[1] - tstart[1]
+          end
+          for l = 2:num_funs
+            if reinterpret(Float64, Bs[1]) ≉ reinterpret(Float64, Bs[l])
+              throw("Funs 1 and $l disagree with dim=$dim, d0=$d0, d1=$d1.")
+            end
+          end
+        end
+        FE = Threads.nthreads() > 1 ? ThreadedForEach : ForEach
+        for (l, fun) in enumerate(funs)
+          brs[l, i, k, j] = bmean(FE(fun, As))
+        end
+        if (counter += 1) != max_count
+          println(round(100counter / max_count; digits = 2), "% complete")
+        end
       end
     end
   end
+  return brs, compile_times
 end
-println(
-  "Total compile times: \nOut of place Julia: ",
-  (BenchmarkTools).prettytime(COMPILE_TIMES[1]),
-  "\nIn place     Julia: ",
-  (BenchmarkTools).prettytime(COMPILE_TIMES[2]),
-  "\nUsing `mul!` Julia: ",
-  (BenchmarkTools).prettytime(COMPILE_TIMES[5]),
-  "\n`ExponentialUtilities.jl`:",
-  (BenchmarkTools).prettytime(COMPILE_TIMES[6]),
-  "\nOut of place GCC:   ",
-  (BenchmarkTools).prettytime(COMPILE_TIMES[3]),
-  "\nOut of place Clang: ",
-  (BenchmarkTools).prettytime(COMPILE_TIMES[4]),
-  "\n"
-)
 
+#=
+funs = [expm_oop!, expm!, expm_naivematmul!, exputils!, gccexpm!, clangexpm!];
+brs, cts = run_benchmarks(funs);
+fun_names = ["Out Of Place", "In Place", "In Place+Naive matmul!", "ExponentialUtilities.exponential!", "GCC", "Clang"]
 
+using CairoMakie, Statistics
+t_vs_sz = mean(brs, dims = (3,4));
+f, ax, l1 = lines(2:8, get_time.(t_vs_sz[1,:,1,1]));
+for l = 2:size(t_vs_sz,1)
+  lines!(2:8, get_time.(t_vs_sz[l,:,1,1]));
+end
+f
+=#
