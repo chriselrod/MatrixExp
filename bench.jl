@@ -504,9 +504,11 @@ fun_names = ["Out Of Place", "In Place", "In Place+Naive matmul!", "ExponentialU
 
 using CairoMakie, Statistics
 t_vs_sz = mean(brs, dims = (3,4));
-f, ax, l1 = lines(2:8, get_time.(t_vs_sz[1,:,1,1]));
+logtime(x) = log10(get_time(x))
+f, ax, l1 = lines(2:8, logtime.(t_vs_sz[1,:,1,1]), label = fun_names[1]);
 for l = 2:size(t_vs_sz,1)
-  lines!(2:8, get_time.(t_vs_sz[l,:,1,1]));
+  lines!(2:8, logtime.(t_vs_sz[l,:,1,1]), label=fun_names[l]);
 end
-f
+axislegend(position=:rb); f
+save("size_vs_log10time.png", f);
 =#
