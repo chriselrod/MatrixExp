@@ -366,7 +366,7 @@ struct ThreadedForEach{A,F}
 end
 ThreadedForEach(f, _, b) = ThreadedForEach(f, b)
 function (f::ThreadedForEach{A})() where {A}
-  r = 0.1:0.01:10.0
+  r = 0.1:0.005:10.0
   if isoutofplace(f.f, Val(A))
     threadedwork!((x, y) -> copyto!(x, f.f(y)), f.a, r)
   else
@@ -499,8 +499,11 @@ end
 
 #=
 funs = [expm_oop!, expm!, expm_naivematmul!, exputils!, gccexpm!, clangexpm!];
-brs, cts = run_benchmarks(funs);
 fun_names = ["Out Of Place", "In Place", "In Place+Naive matmul!", "ExponentialUtilities.exponential!", "GCC", "Clang"]
+funs = [expm!, exputils!, clangexpm!];
+fun_names = ["In Place", "ExponentialUtilities.exponential!", "Clang"]
+brs, cts = run_benchmarks(funs);
+println(cts ./ 1e9)
 
 using CairoMakie, Statistics
 t_vs_sz = mean(brs, dims = (3,4));
