@@ -56,7 +56,7 @@ constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
   invariant(ptrdiff_t(C.numRow()), ptrdiff_t(C.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(B.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(C.numRow()));
-  S D{SquareDims{N == 2 ? Row{0} : B.numRow()}};
+  S D{SquareDims<>{N == 2 ? Row<>{0} : B.numRow()}};
   MutSquarePtrMatrix<T> A{D};
   if (N & 1) std::swap(A, B);
   B << p[0] * C + p[1] * I;
@@ -68,16 +68,15 @@ constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
 
 template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   using S = decltype(extractDualValRecurse(std::declval<utils::eltype_t<T>>()));
-  ptrdiff_t n = ptrdiff_t(A.numRow());
-  invariant(n > 0);
-  Vector<S> v;
-  v.resizeForOverwrite(n);
-  invariant(A.numRow() > 0);
-  for (ptrdiff_t j = 0; j < n; ++j)
-    v[j] = std::abs(extractDualValRecurse(A[0, j]));
-  for (ptrdiff_t i = 1; i < n; ++i)
-    for (ptrdiff_t j = 0; j < n; ++j)
-      v[j] += std::abs(extractDualValRecurse(A[i, j]));
+  auto [M, N] = A.size();
+  invariant(M > 0);
+  invariant(N > 0);
+  Vector<S> v{N};
+  for (ptrdiff_t n = 0; n < N; ++n)
+    v[n] = std::abs(extractDualValRecurse(A[0, n]));
+  for (ptrdiff_t m = 1; m < M; ++m)
+    for (ptrdiff_t n = 0; n < N; ++n)
+      v[n] += std::abs(extractDualValRecurse(A[m, n]));
   return *std::max_element(v.begin(), v.end());
 }
 
@@ -91,11 +90,11 @@ constexpr auto log2ceil(double x) -> unsigned {
 template <typename T>
 constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
   invariant(ptrdiff_t(V.numRow()), ptrdiff_t(A.numRow()));
-  unsigned n = unsigned(A.numRow());
+  ptrdiff_t n = ptrdiff_t(A.numRow());
   auto nA = opnorm1(A);
-  SquareMatrix<T, L> squaredA{A * A}, Utp{SquareDims{n}};
+  SquareMatrix<T, L> squaredA{A * A}, Utp{SquareDims<>{{n}}};
   MutSquarePtrMatrix<T> AA{squaredA}, U{Utp};
-  unsigned int s = 0;
+  unsigned s = 0;
   if (nA <= 2.1) {
     containers::TinyVector<double, 5> p0, p1;
     if (nA > 0.95) {
@@ -151,7 +150,8 @@ template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
   return V;
 }
 template <typename T> void expm(T *A, T *B, ptrdiff_t N) {
-  expm(MutSquarePtrMatrix<T>(A, N), SquarePtrMatrix<T>(B, N));
+  expm(MutSquarePtrMatrix<T>(A, SquareDims<>{{N}}),
+       SquarePtrMatrix<T>(B, SquareDims<>{{N}}));
 }
 
 } // namespace poly::math

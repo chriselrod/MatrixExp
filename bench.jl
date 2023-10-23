@@ -422,8 +422,8 @@ function BMean(b::BenchmarkTools.TrialEstimate)
   a = BenchmarkTools.allocs(b)
   BMean(BenchmarkTools.time(b), BenchmarkTools.memory(b), a)
 end
-Base.:(+)(x::BMean, y::BMean) = BMean(x.t+y.t,x.m+y.m,x.a+y.a)
-Base.:(/)(x::BMean, y::Number) = BMean(x.t/y,x.m/y,x.a/y)
+Base.:(+)(x::BMean, y::BMean) = BMean(x.t + y.t, x.m + y.m, x.a + y.a)
+Base.:(/)(x::BMean, y::Number) = BMean(x.t / y, x.m / y, x.a / y)
 get_time(b::BMean) = b.t
 function Base.show(io::IO, ::MIME"text/plain", b::BMean)
   (; t, m, a) = b
@@ -484,9 +484,15 @@ function run_benchmarks(funs, sizes = 2:8, D0 = 0:8, D1 = 0:2)
             end
           end
         end
-        FE = Threads.nthreads() > 1 ? ThreadedForEach : ForEach
-        for (l, fun) in enumerate(funs)
-          brs[l, i, k, j] = bmean(FE(fun, As))
+        if Threads.nthreads() > 1
+          for (l, fun) in enumerate(funs)
+            brs[l, i, k, j] = bmean(ThreadedForEach(fun, As))
+          end
+        else
+          B = similar(first(As))
+          for (l, fun) in enumerate(funs)
+            brs[l, i, k, j] = bmean(ForEach(fun, B, As))
+          end
         end
         if (counter += 1) != max_count
           println(round(100counter / max_count; digits = 2), "% complete")

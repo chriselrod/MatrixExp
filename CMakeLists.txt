@@ -12,8 +12,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
-  # GIT_TAG origin/eve)
-  GIT_TAG origin/main)
+  GIT_TAG origin/axistypesimplification)
+  # GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
