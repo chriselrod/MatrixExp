@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <bit>
 #include <cstdint>
-#include <random>
+#include <ranges>
 #include <utility>
 
 namespace poly::math {
@@ -17,26 +17,8 @@ namespace poly::math {
 constexpr size_t L = 16;
 static_assert(
   utils::ElementOf<double, SquareMatrix<Dual<Dual<double, 4>, 2>, L>>);
-// auto x = Dual<Dual<double, 4>, 2>{1.0};
-// auto y = x * 3.4;
-// static_assert(Scalar<Dual<double, 4>>);
 static_assert(std::convertible_to<int, Dual<double, 4>>);
 static_assert(std::convertible_to<int, Dual<Dual<double, 4>, 2>>);
-
-template <class D> struct URand {
-  using T = typename D::val_type;
-  static constexpr size_t N = D::num_partials;
-  auto operator()(std::mt19937_64 &mt) -> D {
-    Dual<T, N> x{URand<T>{}(mt)};
-    for (ptrdiff_t i = 0; i < N; ++i) x.gradient()[i] = URand<T>{}(mt);
-    return x;
-  }
-};
-template <> struct URand<double> {
-  auto operator()(std::mt19937_64 &mt) -> double {
-    return std::uniform_real_distribution<double>(-2, 2)(mt);
-  }
-};
 
 template <typename T>
 constexpr auto evalpoly(MutSquarePtrMatrix<T> C, const auto &p) {
@@ -86,6 +68,7 @@ constexpr auto log2ceil(double x) -> unsigned {
   uint64_t u = std::bit_cast<uint64_t>(x) - 1;
   return (u >> 52) - 1022;
 }
+void foo(const auto &, auto &);
 
 template <typename T>
 constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
@@ -133,11 +116,8 @@ constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
            (670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * AA) +
            64764752532480000 * I;
   }
-  for (auto v = V.begin(), u = U.begin(), e = V.end(); v != e; ++v, ++u) {
-    auto &&d = *v - *u;
-    *v += *u;
-    *u = d;
-  }
+  for (auto &&[v, u] : std::ranges::zip_view(V, U))
+    std::tie(v, u) = std::make_pair(v + u, v - u);
   LU::ldiv(U, MutPtrMatrix<T>(V));
   for (; s--;) {
     U << V * V;
@@ -149,9 +129,9 @@ template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
   expm(V, A);
   return V;
 }
-template <typename T> void expm(T *A, T *B, ptrdiff_t N) {
-  expm(MutSquarePtrMatrix<T>(A, SquareDims<>{{N}}),
-       SquarePtrMatrix<T>(B, SquareDims<>{{N}}));
+template <typename T> void expm(T *A, T *B, ptrdiff_t M) {
+  expm(MutSquarePtrMatrix<T>(A, SquareDims<>{{M}}),
+       SquarePtrMatrix<T>(B, SquareDims<>{{M}}));
 }
 
 } // namespace poly::math
