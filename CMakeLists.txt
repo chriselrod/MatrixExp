@@ -42,7 +42,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             -fdiagnostics-color=always
             -fverbose-asm
             -fweb
-            -frename-registers -funroll-loops)
+            -frename-registers)
 endif()
 
 if(ENABLE_NATIVE_COMPILATION)
@@ -99,15 +99,6 @@ target_compile_options(
           -fno-unwind-tables
           -fno-asynchronous-unwind-tables)
 
-# target_precompile_headers(${PROJECT_NAME}
-#   PUBLIC
-#   include/MatrixExp.hpp
-# PRIVATE
-#   <Math/Dual.hpp>
-#   <Math/LinearAlgebra.hpp>
-#   <Math/StaticArrays.hpp>
-#   <Containers/TinyVector.hpp>)
-
 if(ENABLE_LTO)
   include(CheckIPOSupported)
   check_ipo_supported(RESULT supported OUTPUT error)
@@ -121,3 +112,6 @@ if(ENABLE_LTO)
 else() # temps aren't interesting with LTO
   target_compile_options(${PROJECT_NAME} PRIVATE -save-temps)
 endif()
+
+# target_precompile_headers(${PROJECT_NAME} PRIVATE <algorithm>)
+
