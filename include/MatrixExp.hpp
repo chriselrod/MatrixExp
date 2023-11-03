@@ -30,16 +30,14 @@ constexpr auto evalpoly(MutSquarePtrMatrix<T> C, const auto &p) {
   return B;
 }
 template <typename T>
-constexpr void evalpoly(MutSquarePtrMatrix<T> B, SquarePtrMatrix<T> C,
-                        const auto &p) {
+constexpr void evalpoly(MutSquarePtrMatrix<T> B, MutSquarePtrMatrix<T> A,
+                        SquarePtrMatrix<T> C, const auto &p) {
   using S = SquareMatrix<T, L>;
   ptrdiff_t N = p.size();
   invariant(N > 0);
   invariant(ptrdiff_t(C.numRow()), ptrdiff_t(C.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(B.numCol()));
   invariant(ptrdiff_t(B.numRow()), ptrdiff_t(C.numRow()));
-  S D{SquareDims<>{N == 2 ? Row<>{0} : B.numRow()}};
-  MutSquarePtrMatrix<T> A{D};
   if (N & 1) std::swap(A, B);
   B << p[0] * C + p[1] * I;
   for (ptrdiff_t i = 2; i < N; ++i) {
@@ -122,6 +120,62 @@ constexpr void expm(MutSquarePtrMatrix<T> V, SquarePtrMatrix<T> A) {
   for (; s--;) {
     U << V * V;
     std::swap(U, V);
+  }
+}
+template <typename T> constexpr void expm(SquarePtrMatrix<T> A) {
+  ptrdiff_t n = ptrdiff_t(A.numRow());
+  auto nA = opnorm1(A);
+  SquareMatrix<T, L> squaredA{A * A}, U_{SquareDims<>{{n}}};
+  MutSquarePtrMatrix<T> AA{squaredA}, U{U_};
+  unsigned s = 0;
+  if (nA <= 0.015) {
+    U << A * (AA + 60.0 * I);
+    A << 12.0 * AA + 120.0 * I;
+  } else {
+    SquareMatrix<T, L> B_{SquareDims<>{{n}}};
+    MutSquarePtrMatrix<T> B{B_};
+    if (nA <= 2.1) {
+      containers::TinyVector<double, 5> p0, p1;
+      if (nA > 0.95) {
+        p0 = {1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0};
+        p1 = {90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10};
+      } else if (nA > 0.25) {
+        p0 = {1.0, 1512.0, 277200.0, 8.64864e6};
+        p1 = {56.0, 25200.0, 1.99584e6, 1.729728e7};
+      } else {
+        p0 = {1.0, 420.0, 15120.0};
+        p1 = {30.0, 3360.0, 30240.0};
+      }
+      evalpoly(B, U, AA, p0);
+      U << A * B;
+      evalpoly(A, B, AA, p1);
+    } else {
+      // s = std::max(unsigned(std::ceil(std::log2(nA / 5.4))), unsigned(0));
+      s = nA > 5.4 ? log2ceil(nA / 5.4) : unsigned(0);
+      double t = (s > 0) ? 1.0 / exp2(s) : 0.0;
+      if (s > 0) AA *= (t * t);
+      // here we take an estrin (instead of horner) approach to cut down flops
+      SquareMatrix<T, L> A4{AA * AA}, A6{AA * A4};
+      B << A6 * (A6 + 16380 * A4 + 40840800 * AA) +
+             (33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * AA) +
+             32382376266240000 * I;
+      U << A * B;
+      if (s & 1) {  // we have an odd number of swaps at the end
+        A << U * t; // copy data to `A`, so we can swap and make it even
+        std::swap(A, U);
+      } else if (s > 0) U *= t;
+      A << A6 * (182 * A6 + 960960 * A4 + 1323241920 * AA) +
+             (670442572800 * A6 + 129060195264000 * A4 +
+              7771770303897600 * AA) +
+             64764752532480000 * I;
+    }
+  }
+  for (auto &&[a, u] : std::ranges::zip_view(A, U))
+    std::tie(a, u) = std::make_pair(a + u, a - u);
+  LU::ldiv(U, MutPtrMatrix<T>(A));
+  for (; s--;) {
+    U << A * A;
+    std::swap(U, A);
   }
 }
 template <typename T> constexpr auto expm(SquarePtrMatrix<T> A) {
