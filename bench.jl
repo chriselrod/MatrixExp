@@ -23,36 +23,40 @@ function expm(A::AbstractMatrix{S}) where {S}
   if (nA <= 2.1)
     A2 = A * A
     if nA > 0.95
-      U = @evalpoly(
+      U = evalpoly(
         A2,
-        S(8821612800) * I,
-        S(302702400) * I,
-        S(2162160) * I,
-        S(3960) * I,
-        S(1) * I
+        (
+          S(8821612800) * I,
+          S(302702400) * I,
+          S(2162160) * I,
+          S(3960) * I,
+          S(1) * I
+        )
       )
       U = A * U
-      V = @evalpoly(
+      V = evalpoly(
         A2,
-        S(17643225600) * I,
-        S(2075673600) * I,
-        S(30270240) * I,
-        S(110880) * I,
-        S(90) * I
+        (
+          S(17643225600) * I,
+          S(2075673600) * I,
+          S(30270240) * I,
+          S(110880) * I,
+          S(90) * I
+        )
       )
     elseif nA > 0.25
-      U = @evalpoly(A2, S(8648640) * I, S(277200) * I, S(1512) * I, S(1) * I)
+      U = evalpoly(A2, (S(8648640) * I, S(277200) * I, S(1512) * I, S(1) * I))
       U = A * U
       V =
-        @evalpoly(A2, S(17297280) * I, S(1995840) * I, S(25200) * I, S(56) * I)
+        evalpoly(A2, (S(17297280) * I, S(1995840) * I, S(25200) * I, S(56) * I))
     elseif nA > 0.015
-      U = @evalpoly(A2, S(15120) * I, S(420) * I, S(1) * I)
+      U = evalpoly(A2, (S(15120) * I, S(420) * I, S(1) * I))
       U = A * U
-      V = @evalpoly(A2, S(30240) * I, S(3360) * I, S(30) * I)
+      V = evalpoly(A2, (S(30240) * I, S(3360) * I, S(30) * I))
     else
-      U = @evalpoly(A2, S(60) * I, S(1) * I)
+      U = evalpoly(A2, (S(60) * I, S(1) * I))
       U = A * U
-      V = @evalpoly(A2, S(120) * I, S(12) * I)
+      V = evalpoly(A2, (S(120) * I, S(12) * I))
     end
     expA = (V - U) \ (V + U)
   else
@@ -378,31 +382,24 @@ const libMatrixExp = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
 for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
   j = Symbol(cc, :expm!)
-  @eval $j(A::Matrix{Float64}, reps::Int) =
-    @ccall $lib.food(A::Ptr{Float64}, size(A, 1)::Clong, reps::Clong)::Float64
 
-  @eval $j(B::Matrix{Float64}, A::Matrix{Float64}) = @ccall $lib.expmf64(
-    B::Ptr{Float64},
+  @eval $j(A::Matrix{Float64}) = @ccall $lib.expmf64(
     A::Ptr{Float64},
     size(A, 1)::Clong
   )::Nothing
   for n = 1:8
     sym = Symbol(:expmf64d, n)
     @eval $j(
-      B::Matrix{ForwardDiff.Dual{T,Float64,$n}},
       A::Matrix{ForwardDiff.Dual{T,Float64,$n}}
     ) where {T} = @ccall $lib.$sym(
-      B::Ptr{Float64},
       A::Ptr{Float64},
       size(A, 1)::Clong
     )::Nothing
     for i = 1:2
       sym = Symbol(:expmf64d, n, :d, i)
       @eval $j(
-        B::Matrix{ForwardDiff.Dual{T1,ForwardDiff.Dual{T0,Float64,$n},$i}},
         A::Matrix{ForwardDiff.Dual{T1,ForwardDiff.Dual{T0,Float64,$n},$i}}
       ) where {T0,T1} = @ccall $lib.$sym(
-        B::Ptr{Float64},
         A::Ptr{Float64},
         size(A, 1)::Clong
       )::Nothing
