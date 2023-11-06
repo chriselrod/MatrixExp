@@ -38,13 +38,21 @@ template <AbstractMatrix T> constexpr auto opnorm1(const T &A) {
   auto [M, N] = A.size();
   invariant(M > 0);
   invariant(N > 0);
-  Vector<S> v{N};
-  for (ptrdiff_t n = 0; n < N; ++n)
-    v[n] = std::abs(extractDualValRecurse(A[0, n]));
-  for (ptrdiff_t m = 1; m < M; ++m)
-    for (ptrdiff_t n = 0; n < N; ++n)
-      v[n] += std::abs(extractDualValRecurse(A[m, n]));
-  return *std::max_element(v.begin(), v.end());
+  S a{};
+  for (ptrdiff_t n = 0; n < N; ++n) {
+    S s{};
+    for (ptrdiff_t m = 0; m < M; ++m)
+      s += std::abs(extractDualValRecurse(A[m, n]));
+    a = std::max(a, s);
+  }
+  return a;
+  // Vector<S> v{N};
+  // for (ptrdiff_t n = 0; n < N; ++n)
+  //   v[n] = std::abs(extractDualValRecurse(A[0, n]));
+  // for (ptrdiff_t m = 1; m < M; ++m)
+  //   for (ptrdiff_t n = 0; n < N; ++n)
+  //     v[n] += std::abs(extractDualValRecurse(A[m, n]));
+  // return *std::max_element(v.begin(), v.end());
 }
 
 /// computes ceil(log2(x)) for x >= 1
@@ -83,7 +91,7 @@ template <typename T> constexpr void expm(MutSquarePtrMatrix<T> A) {
     } else {
       // s = std::max(unsigned(std::ceil(std::log2(nA / 5.4))), 0);
       s = nA > 5.4 ? log2ceil(nA / 5.4) : 0;
-      double t = (s > 0) ? 1.0 / exp2(s) : 0.0;
+      double t = (s > 0) ? exp2(-s) : 0.0;
       if (s > 0) A2 *= (t * t);
       // here we take an estrin (instead of horner) approach to cut down flops
       SquareMatrix<T, L> A4{A2 * A2}, A6{A2 * A4};

@@ -1,3 +1,457 @@
+
+using Base.Threads, ForwardDiff, ExponentialUtilities
+
+# utilities for dealing with nested tuples
+# we use nested instead of flat tuples to avoid heuristics
+# that avoid specializing on long tuples
+rmap(f, ::Tuple{}) = ()
+rmap(f::F, x::Tuple) where {F} = map(f, x)
+rmap(f::F, x::Tuple{Vararg{Tuple,K}}) where {F,K} = map(Base.Fix1(rmap, f), x)
+rmap(f, ::Tuple{}, ::Tuple{}) = ()
+rmap(f::F, x::Tuple, y::Tuple) where {F} = map(f, x, y)
+rmap(f::F, x::Tuple{Vararg{Tuple,K}}, y::Tuple{Vararg{Tuple,K}}) where {F,K} =
+  map((a, b) -> rmap(f, a, b), x, y)
+
+# rmaptnum applies `f` to a tuple of non-tuples
+rmaptnum(f, ::Tuple{}) = ()
+rmaptnum(f::F, x::Tuple{Vararg{Tuple{Vararg}}}) where {F} = map(f, x)
+rmaptnum(f::F, x::Tuple{Vararg{Tuple{Vararg{Tuple}}}}) where {F} =
+  map(Base.Fix1(rmaptnum, f), x)
+
+struct SumScaleMatrixExponential{F}
+  f!::F
+  s::Float64
+end
+function (sme::SumScaleMatrixExponential)(B, A)
+  for i in eachindex(B, A)
+    B[i] = sme.s * A[i]
+  end
+  sme.f!(B)
+  return sum(B)
+end
+
+function do_singlethreaded_work!(f!::F, Bs, As, r) where {F}
+  ret = rmaptnum(zero ∘ eltype ∘ eltype, Bs)
+  for s in r
+    incr = rmap(SumScaleMatrixExponential(f!, s), Bs, As)
+    ret = rmap(+, ret, rmaptnum(sum, incr))
+  end
+  return ret
+end
+
+function do_multithreaded_work!(f!::F, Bs, As, r) where {F}
+  nt = Threads.nthreads(:default)
+  nt > 1 || return do_singlethreaded_work!(f!, Bs, As, r)
+  tasks = Vector{Task}(undef, nt)
+  for n = 1:nt
+    subrange = r[n:nt:end] # stride to balance opnorms across threads
+    Bsc = n == nt ? Bs : rmap(copy, Bs)
+    tasks[n] = Threads.@spawn do_singlethreaded_work!($f!, $Bsc, $As, $subrange)
+  end
+  _ret = rmaptnum(zero ∘ eltype ∘ eltype, Bs)
+  ret::typeof(_ret) = Threads.fetch(tasks[1])
+  for n = 2:nt
+    ret = rmap(+, ret, Threads.fetch(tasks[n]))
+  end
+  return ret
+end
+
+max_size = 16
+d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
+function dualify(A, n, j)
+  n == 0 && return A
+  j == 0 ? d.(A, n) : d.(d.(A, n), j)
+end
+randdual(n, dinner, douter) = dualify(rand(n, n), dinner, douter)
+As = map((0, 1, 2)) do dout # outer dual
+  map(ntuple(identity, Val(9)) .- 1) do din # inner dual
+    map(ntuple(identity, Val(max_size - 1)) .+ 1) do n # matrix size
+      randdual(n, din, dout)
+    end
+  end
+end;
+Bs = rmap(similar, As);
+
+testrange = range(0.001; stop = 6.0, length = 1_000)
+res = @time @eval do_multithreaded_work!(exponential!, Bs, As, testrange);
+@time do_multithreaded_work!(exponential!, Bs, As, testrange);
+
+const libExpMatGCC = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
+const libExpMatClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
+for (lib, cc) in ((:libExpMatGCC, :gcc), (:libExpMatClang, :clang))
+  j = Symbol(cc, :expm!)
+
+  @eval $j(A::Matrix{Float64}) =
+    @ccall $lib.expmf64(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
+  for n = 1:8
+    sym = Symbol(:expmf64d, n)
+    @eval $j(A::Matrix{ForwardDiff.Dual{T,Float64,$n}}) where {T} =
+      @ccall $lib.$sym(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
+    for i = 1:2
+      sym = Symbol(:expmf64d, n, :d, i)
+      @eval $j(
+        A::Matrix{ForwardDiff.Dual{T1,ForwardDiff.Dual{T0,Float64,$n},$i}}
+      ) where {T0,T1} =
+        @ccall $lib.$sym(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
+    end
+  end
+end
+
+rescpp = @time @eval do_multithreaded_work!(clangexpm!, Bs, As, testrange)
+approxd(x, y) = isapprox(x, y)
+function approxd(x::ForwardDiff.Dual, y::ForwardDiff.Dual)
+  approxd(x.value, y.value) && approxd(Tuple(x.partials), Tuple(y.partials))
+end
+approxd(x::Tuple, y::Tuple) = all(map(approxd, x, y))
+@assert approxd(res, rescpp)
+
+@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+
+using LinearAlgebra
+# My C++ `opnorm` implementation only looks at Dual's values
+# so lets just go ahead and copy that optimization here.
+_deval(x) = x
+_deval(x::ForwardDiff.Dual) = _deval(ForwardDiff.value(x))
+function opnorm1(A)
+  n = _deval(zero(eltype(A)))
+  @inbounds for j in axes(A, 2)
+    s = _deval(zero(eltype(A)))
+    @simd for i in axes(A, 1)
+      s += abs(_deval(A[i, j]))
+    end
+    n = max(n, s)
+  end
+  return n
+end
+
+# Let's also immediately implement our own `evalpoly` to cut down
+# allocations. `B` contains the result, `A` is a temporary
+# that we reuse (following the same approach as in C++)
+function matevalpoly!(B, A, C, t::NTuple, N)
+  @assert N > 1
+  if isodd(N)
+    A, B = B, A
+  end
+  B .= t[1] .* C
+  @view(B[diagind(B)]) .+= t[2]
+  for n = 3:N
+    A, B = B, A
+    mul!(B, A, C)
+    @view(B[diagind(B)]) .+= t[n]
+  end
+end
+
+log2ceil(x::Float64) =
+  (reinterpret(Int, x) - 1) >> Base.significand_bits(Float64) - 1022
+
+function expm!(A::AbstractMatrix)
+  N = size(A, 1)
+  s = 0
+  N == size(A, 2) || error("Matrix is not square.")
+  A2 = A * A
+  U = similar(A)
+  if (nA = opnorm1(A); nA <= 0.015)
+    mul!(U, A, A2 + 60.0I)
+    # broadcasting doesn't work with `I`
+    A .= 12.0 .* A2
+    @view(A[diagind(A)]) .+= 120.0
+  else
+    B = similar(A)
+    if nA <= 2.1
+      # No need to specialize on different tuple sizes
+      if nA > 0.95
+        p0 = (1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0)
+        p1 = (90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10)
+        N = 5
+      elseif nA > 0.25
+        p0 = (1.0, 1512.0, 277200.0, 8.64864e6, 0.0)
+        p1 = (56.0, 25200.0, 1.99584e6, 1.729728e7, 0.0)
+        N = 4
+      else
+        p0 = (1.0, 420.0, 15120.0, 0.0, 0.0)
+        p1 = (30.0, 3360.0, 30240.0, 0.0, 0.0)
+        N = 3
+      end
+      matevalpoly!(B, U, A2, p0, N)
+      mul!(U, A, B)
+      matevalpoly!(A, B, A2, p1, N)
+    else
+      s = nA > 5.4 ? log2ceil(nA / 5.4) : 0
+      t = (s > 0) ? exp2(-s) : 0.0
+      (s > 0) && (A2 .*= t * t)
+      A4 = A2 * A2
+      A6 = A2 * A4
+      # we use `U` as a temporary here that we didn't
+      # need in the C++ code for the estrin-style polynomial
+      # evaluation. Thankfully we don't need another allocation!
+      @. U = A6 + 16380 * A4 + 40840800 * A2
+      mul!(B, A6, U)
+      @. B += 33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2
+      @view(B[diagind(B)]) .+= 32382376266240000
+      mul!(U, A, B)
+      # Like in the C++ code, we swap A and U `s` times at the end
+      # so if `s` is odd, we pre-swap to end with the original
+      # `A` being filled by the answer
+      if isodd(s)
+        A .= U .* t
+        A, U = U, A
+      elseif s > 0
+        U .*= t
+      end
+      # we use `B` as a temporary here we didn't
+      # need in the C++ code
+      @. B = 182 * A6 + 960960 * A4 + 1323241920 * A2
+      mul!(A, A6, B)
+      @. A += 670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2
+      @view(A[diagind(A)]) .+= 64764752532480000
+    end
+  end
+  @inbounds for i in eachindex(A, U)
+    A[i], U[i] = A[i] + U[i], A[i] - U[i]
+  end
+  ldiv!(lu!(U), A)
+  for _ = 1:s
+    mul!(U, A, A)
+    A, U = U, A
+  end
+end
+
+resexpm = @time @eval do_multithreaded_work!(expm!, Bs, As, testrange);
+@assert approxd(res, resexpm)
+
+@time do_multithreaded_work!(expm!, Bs, As, testrange);
+
+function mulreduceinnerloop!(C, A, B)
+  AxM = axes(A, 1)
+  AxK = axes(A, 2) # we use two `axes` calls in case of `AbstractVector`
+  BxK = axes(B, 1)
+  BxN = axes(B, 2)
+  CxM = axes(C, 1)
+  CxN = axes(C, 2)
+  if AxM != CxM
+    throw(
+      DimensionMismatch(
+        lazy"matrix A has axes ($AxM,$AxK), matrix C has axes ($CxM,$CxN)"
+      )
+    )
+  end
+  if AxK != BxK
+    throw(
+      DimensionMismatch(
+        lazy"matrix A has axes ($AxM,$AxK), matrix B has axes ($BxK,$CxN)"
+      )
+    )
+  end
+  if BxN != CxN
+    throw(
+      DimensionMismatch(
+        lazy"matrix B has axes ($BxK,$BxN), matrix C has axes ($CxM,$CxN)"
+      )
+    )
+  end
+  @inbounds for n in BxN, m in AxM
+    Cmn = zero(eltype(C))
+    for k in BxK
+      Cmn = muladd(A[m, k], B[k, n], Cmn)
+    end
+    C[m, n] = Cmn
+  end
+  return C
+end
+function matevalpoly_custommul!(B, A, C, t::NTuple, N)
+  @assert N > 1
+  if isodd(N)
+    A, B = B, A
+  end
+  B .= t[1] .* C
+  @view(B[diagind(B)]) .+= t[2]
+  for n = 3:N
+    A, B = B, A
+    mulreduceinnerloop!(B, A, C)
+    @view(B[diagind(B)]) .+= t[n]
+  end
+end
+
+function expm_custommul!(A::AbstractMatrix)
+  N = size(A, 1)
+  s = 0
+  N == size(A, 2) || error("Matrix is not square.")
+  A2 = mulreduceinnerloop!(similar(A), A, A)
+  U = similar(A)
+  if (nA = opnorm1(A); nA <= 0.015)
+    mulreduceinnerloop!(U, A, A2 + 60.0I)
+    # broadcasting doesn't work with `I`
+    A .= 12.0 .* A2
+    @view(A[diagind(A)]) .+= 120.0
+  else
+    B = similar(A)
+    if nA <= 2.1
+      # No need to specialize on different tuple sizes
+      if nA > 0.95
+        p0 = (1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0)
+        p1 = (90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10)
+        N = 5
+      elseif nA > 0.25
+        p0 = (1.0, 1512.0, 277200.0, 8.64864e6, 0.0)
+        p1 = (56.0, 25200.0, 1.99584e6, 1.729728e7, 0.0)
+        N = 4
+      else
+        p0 = (1.0, 420.0, 15120.0, 0.0, 0.0)
+        p1 = (30.0, 3360.0, 30240.0, 0.0, 0.0)
+        N = 3
+      end
+      matevalpoly_custommul!(B, U, A2, p0, N)
+      mulreduceinnerloop!(U, A, B)
+      matevalpoly_custommul!(A, B, A2, p1, N)
+    else
+      s = nA > 5.4 ? log2ceil(nA / 5.4) : 0
+      t = (s > 0) ? exp2(-s) : 0.0
+      (s > 0) && (A2 .*= t * t)
+      A4 = mulreduceinnerloop!(similar(A), A2, A2)
+      A6 = mulreduceinnerloop!(similar(A), A2, A4)
+      # we use `U` as a temporary here that we didn't
+      # need in the C++ code for the estrin-style polynomial
+      # evaluation. Thankfully we don't need another allocation!
+      @. U = A6 + 16380 * A4 + 40840800 * A2
+      mulreduceinnerloop!(B, A6, U)
+      @. B += 33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2
+      @view(B[diagind(B)]) .+= 32382376266240000
+      mulreduceinnerloop!(U, A, B)
+      # Like in the C++ code, we swap A and U `s` times at the end
+      # so if `s` is odd, we pre-swap to end with the original
+      # `A` being filled by the answer
+      if isodd(s)
+        A .= U .* t
+        A, U = U, A
+      elseif s > 0
+        U .*= t
+      end
+      # we use `B` as a temporary here we didn't
+      # need in the C++ code
+      @. B = 182 * A6 + 960960 * A4 + 1323241920 * A2
+      mulreduceinnerloop!(A, A6, B)
+      @. A += 670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2
+      @view(A[diagind(A)]) .+= 64764752532480000
+    end
+  end
+  @inbounds for i in eachindex(A, U)
+    A[i], U[i] = A[i] + U[i], A[i] - U[i]
+  end
+  ldiv!(lu!(U), A)
+  for _ = 1:s
+    mulreduceinnerloop!(U, A, A)
+    A, U = U, A
+  end
+end
+
+resexpmcm =
+  @time @eval do_multithreaded_work!(expm_custommul!, Bs, As, testrange)
+@assert approxd(res, resexpmcm)
+
+t_expm_custommul =
+  @elapsed do_multithreaded_work!(expm_custommul!, Bs, As, testrange)
+
+function tlssimilar(A)
+  ret = get!(task_local_storage(), A) do
+    ntuple(_ -> similar(A), Val(5))
+  end
+  return ret::NTuple{5,typeof(A)}
+end
+
+function expm_tls!(A::AbstractMatrix)
+  N = size(A, 1)
+  s = 0
+  N == size(A, 2) || error("Matrix is not square.")
+  U, B, A2, A4, A6 = tlssimilar(A)
+  mulreduceinnerloop!(A2, A, A)
+  if (nA = opnorm1(A); nA <= 0.015)
+    B .= A2
+    @view(B[diagind(B)]) .+= 60.0
+    mulreduceinnerloop!(U, A, B)
+    # broadcasting doesn't work with `I`
+    A .= 12.0 .* A2
+    @view(A[diagind(A)]) .+= 120.0
+  else
+    if nA <= 2.1
+      # No need to specialize on different tuple sizes
+      if nA > 0.95
+        p0 = (1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0)
+        p1 = (90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10)
+        N = 5
+      elseif nA > 0.25
+        p0 = (1.0, 1512.0, 277200.0, 8.64864e6, 0.0)
+        p1 = (56.0, 25200.0, 1.99584e6, 1.729728e7, 0.0)
+        N = 4
+      else
+        p0 = (1.0, 420.0, 15120.0, 0.0, 0.0)
+        p1 = (30.0, 3360.0, 30240.0, 0.0, 0.0)
+        N = 3
+      end
+      matevalpoly_custommul!(B, U, A2, p0, N)
+      mulreduceinnerloop!(U, A, B)
+      matevalpoly_custommul!(A, B, A2, p1, N)
+    else
+      s = nA > 5.4 ? log2ceil(nA / 5.4) : 0
+      t = (s > 0) ? exp2(-s) : 0.0
+      (s > 0) && (A2 .*= t * t)
+      mulreduceinnerloop!(A4, A2, A2)
+      mulreduceinnerloop!(A6, A2, A4)
+      # we use `U` as a temporary here that we didn't
+      # need in the C++ code for the estrin-style polynomial
+      # evaluation. Thankfully we don't need another allocation!
+      @. U = A6 + 16380 * A4 + 40840800 * A2
+      mulreduceinnerloop!(B, A6, U)
+      @. B += 33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2
+      @view(B[diagind(B)]) .+= 32382376266240000
+      mulreduceinnerloop!(U, A, B)
+      # Like in the C++ code, we swap A and U `s` times at the end
+      # so if `s` is odd, we pre-swap to end with the original
+      # `A` being filled by the answer
+      if isodd(s)
+        A .= U .* t
+        A, U = U, A
+      elseif s > 0
+        U .*= t
+      end
+      # we use `B` as a temporary here we didn't
+      # need in the C++ code
+      @. B = 182 * A6 + 960960 * A4 + 1323241920 * A2
+      mulreduceinnerloop!(A, A6, B)
+      @. A += 670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2
+      @view(A[diagind(A)]) .+= 64764752532480000
+    end
+  end
+  @inbounds for i in eachindex(A, U)
+    A[i], U[i] = A[i] + U[i], A[i] - U[i]
+  end
+  ldiv!(lu!(U), A)
+  for _ = 1:s
+    mulreduceinnerloop!(U, A, A)
+    A, U = U, A
+  end
+end
+
+restls = @time @eval do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+@assert approxd(res, restls)
+@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+
+
+
+
+
+
+
+
+
+
+#
+#
+#
+#
+#
+#
+
+
 using LinearAlgebra,
   Statistics, ForwardDiff, BenchmarkTools, ExponentialUtilities
 
@@ -383,26 +837,18 @@ const libMatrixExpClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
 for (lib, cc) in ((:libMatrixExp, :gcc), (:libMatrixExpClang, :clang))
   j = Symbol(cc, :expm!)
 
-  @eval $j(A::Matrix{Float64}) = @ccall $lib.expmf64(
-    A::Ptr{Float64},
-    size(A, 1)::Clong
-  )::Nothing
+  @eval $j(A::Matrix{Float64}) =
+    @ccall $lib.expmf64(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
   for n = 1:8
     sym = Symbol(:expmf64d, n)
-    @eval $j(
-      A::Matrix{ForwardDiff.Dual{T,Float64,$n}}
-    ) where {T} = @ccall $lib.$sym(
-      A::Ptr{Float64},
-      size(A, 1)::Clong
-    )::Nothing
+    @eval $j(A::Matrix{ForwardDiff.Dual{T,Float64,$n}}) where {T} =
+      @ccall $lib.$sym(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
     for i = 1:2
       sym = Symbol(:expmf64d, n, :d, i)
       @eval $j(
         A::Matrix{ForwardDiff.Dual{T1,ForwardDiff.Dual{T0,Float64,$n},$i}}
-      ) where {T0,T1} = @ccall $lib.$sym(
-        A::Ptr{Float64},
-        size(A, 1)::Clong
-      )::Nothing
+      ) where {T0,T1} =
+        @ccall $lib.$sym(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
     end
   end
 end
