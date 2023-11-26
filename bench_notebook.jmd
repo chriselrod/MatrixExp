@@ -577,3 +577,9 @@ Note
 ```
 The total amount of time we saved from this approach is 1.4x the total time C++ required! On top of performing the computations, that includes its own heap allocations and freeing, which the C++ code is still doing but our Julia tls method is avoiding at the cost of increasing the total amount of memory needed through creating task local caches.
 
+
+To build the notebook, you need Clang 17 installed on the path and Weave.
+```{julia; eval=false}
+using Weave
+weave("bench_notebook.jmd", informat="markdown", doctype="github")
+```
