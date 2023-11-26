@@ -91,7 +91,7 @@ Bs = rmap(similar, As);
 
 Lets set C++ as a baseline with this.
 We'll base our implementation on [StaticArrays.exp](https://github.com/JuliaArrays/StaticArrays.jl/blob/72d2bd3538235c9162f630a5130112b83eaa0af7/src/expm.jl#L75-L129), as this implementation is simpler than the one from `ExponentialUtilities.jl`. The core of our C++ implementation is only 50 lines of code:
-```c++
+```cpp
 template <typename T> constexpr void expm(MutSquarePtrMatrix<T> A) {
   ptrdiff_t n = ptrdiff_t(A.numRow()), s = 0;
   SquareMatrix<T> A2{SquareDims<>{{n}}}, U_{SquareDims<>{{n}}};
@@ -576,6 +576,11 @@ Note
 (t_expm_custommul - t_tls) / t_clang
 ```
 The total amount of time we saved from this approach is over 3x the total time C++ required! On top of performing the computations, that includes its own heap allocations and freeing, which the C++ code is still doing but our Julia tls method is avoiding at the cost of increasing the total amount of memory needed through creating task local caches.
+
+These results were obtained using
+```julia
+versioninfo()
+```
 
 
 To build the notebook, you need Clang 17 installed on the path and Weave.
