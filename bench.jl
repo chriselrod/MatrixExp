@@ -56,7 +56,7 @@ function do_multithreaded_work!(f!::F, Bs, As, r) where {F}
   return ret
 end
 
-max_size = 16
+max_size = 5
 d(x, n) = ForwardDiff.Dual(x, ntuple(_ -> randn(), n))
 function dualify(A, n, j)
   n == 0 && return A
@@ -73,8 +73,8 @@ end;
 Bs = rmap(similar, As);
 
 testrange = range(0.001; stop = 6.0, length = 1_000)
-res = @time @eval do_multithreaded_work!(exponential!, Bs, As, testrange);
-@time do_multithreaded_work!(exponential!, Bs, As, testrange);
+# res = @time @eval do_multithreaded_work!(exponential!, Bs, As, testrange);
+# @time do_multithreaded_work!(exponential!, Bs, As, testrange);
 
 const libExpMatGCC = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libExpMatClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
@@ -97,7 +97,28 @@ for (lib, cc) in ((:libExpMatGCC, :gcc), (:libExpMatClang, :clang))
   end
 end
 
-rescpp = @time @eval do_multithreaded_work!(clangexpm!, Bs, As, testrange)
+A4_7 = randdual(4, 7, 0);
+B4_7 = similar(A4_7);
+C4_7 = similar(A4_7);
+
+clangexpm!(copyto!(C4_7, A4_7));
+C4_7;
+exponential!(copyto!(B4_7, A4_7))
+reinterpret(Float64, B4_7) ≈ reinterpret(Float64, C4_7)
+
+@testset begin
+  for o = 0:2, i = 1:8
+    @show i, o
+    A = randdual(4, i, o)
+    B = similar(A)
+    C = similar(A)
+    clangexpm!(copyto!(C, A))
+    exponential!(copyto!(B, A))
+    @test reinterpret(Float64, B) ≈ reinterpret(Float64, C)
+  end
+end
+
+rescpp = @time @eval do_multithreaded_work!(clangexpm!, Bs, As, testrange);
 approxd(x, y) = isapprox(x, y)
 function approxd(x::ForwardDiff.Dual, y::ForwardDiff.Dual)
   approxd(x.value, y.value) && approxd(Tuple(x.partials), Tuple(y.partials))
@@ -345,7 +366,7 @@ function expm_custommul!(A::AbstractMatrix)
 end
 
 resexpmcm =
-  @time @eval do_multithreaded_work!(expm_custommul!, Bs, As, testrange)
+  @time @eval do_multithreaded_work!(expm_custommul!, Bs, As, testrange);
 @assert approxd(res, resexpmcm)
 
 t_expm_custommul =
@@ -435,14 +456,48 @@ restls = @time @eval do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 @assert approxd(res, restls)
 @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 
+testrange = range(0.001; stop = 6.0, length = 30_000)
+@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+testrange = range(0.001; stop = 6.0, length = 100_000)
+@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 
+# compared to current version, the fastest version did not have
+# # `[[gnu::always_inline]]` on `Dual` ops and also used 256-bit vectors.
+# Still experimenting, may revert to that. Best c++ results:
+# julia> testrange = range(0.001; stop = 6.0, length = 100_000)
+# 0.001:5.999059990599906e-5:6.0
+# julia> @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+#   2.553349 seconds (603.17 k allocations: 1.394 GiB, 1.72% gc time)
+# julia> @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+#   2.563331 seconds (603.17 k allocations: 1.394 GiB, 1.72% gc time)
+# julia> @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+#   3.511809 seconds (74.71 M allocations: 4.653 GiB, 9.25% gc time)
+# julia> @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+#   3.519219 seconds (74.71 M allocations: 4.653 GiB, 9.64% gc time)
 
+# # Current:
+# julia> @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+#   3.054223 seconds (603.17 k allocations: 1.394 GiB, 1.28% gc time)
+# julia> @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+#   2.994284 seconds (603.17 k allocations: 1.394 GiB, 2.54% gc time)
+# julia> @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+#   3.503206 seconds (73.82 M allocations: 4.620 GiB, 9.28% gc time)
+# julia> @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+#   3.493063 seconds (73.82 M allocations: 4.620 GiB, 9.43% gc time)
 
-
-
-
-
-
+# We also added a lot of POLYMATHNOVECTORIZE
+# TODO: define `dot`-product? , optimize lu/ldiv
+# Define/support a'*B 
 
 #
 #
@@ -450,7 +505,6 @@ restls = @time @eval do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 #
 #
 #
-
 
 using LinearAlgebra,
   Statistics, ForwardDiff, BenchmarkTools, ExponentialUtilities

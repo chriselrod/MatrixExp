@@ -4,7 +4,7 @@ project(MatrixExp LANGUAGES CXX)
 
 option(ENABLE_NATIVE_COMPILATION "Compile with -march=native" ON)
 option(ENABLE_LTO "Compile with link time optimizations" OFF)
-option(USE_WIDE_VECTORS "Set wide vectors even though compilers are bad at optimizing" OFF)
+option(USE_WIDE_VECTORS "Set wide vectors even though compilers are bad at optimizing" ON)
 
 include(FetchContent)
 
@@ -13,7 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
-  GIT_TAG origin/main)
+  GIT_TAG origin/simd)
+  # GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
@@ -100,7 +101,7 @@ target_compile_options(
           -Wextra
           -Werror
           -fno-unwind-tables
-          -fno-asynchronous-unwind-tables)
+          -fno-asynchronous-unwind-tables -fopenmp-simd)
 
 if(ENABLE_LTO)
   include(CheckIPOSupported)
