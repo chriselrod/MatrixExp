@@ -3,7 +3,7 @@
 
 extern "C" {
 void __attribute__((visibility("default")))
-expmf64d4(Dual<double, 4> *A, Dual<double, 4> *B, ptrdiff_t N) {
-  expm(A, B, N);
+expmf64d4(Dual<double, 4, true> *A, ptrdiff_t N) {
+  expm(A, N);
 }
 }

@@ -4,6 +4,7 @@ project(MatrixExp LANGUAGES CXX)
 
 option(ENABLE_NATIVE_COMPILATION "Compile with -march=native" ON)
 option(ENABLE_LTO "Compile with link time optimizations" OFF)
+option(USE_WIDE_VECTORS "Set wide vectors even though compilers are bad at optimizing" ON)
 
 include(FetchContent)
 
@@ -12,7 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
-  GIT_TAG origin/main)
+  GIT_TAG origin/simd)
+  # GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
@@ -49,12 +51,13 @@ if(ENABLE_NATIVE_COMPILATION)
   if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
     target_compile_options(${PROJECT_NAME} PRIVATE -xhost -qopt-zmm-usage=high)
   else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -march=native
-    )# -fno-unroll-loops)
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag("-mprefer-vector-width=512" VEC512)
-    if(VEC512)
-      target_compile_options(${PROJECT_NAME} PRIVATE -mprefer-vector-width=512)
+    target_compile_options(${PROJECT_NAME} PRIVATE -march=native) 
+    if (USE_WIDE_VECTORS)
+      include(CheckCXXCompilerFlag)
+      check_cxx_compiler_flag("-mprefer-vector-width=512" VEC512)
+      if(VEC512)
+        target_compile_options(${PROJECT_NAME} PRIVATE -mprefer-vector-width=512)
+      endif()
     endif()
   endif()
 endif()
@@ -82,7 +85,8 @@ set_target_properties(
              VISIBILITY_INLINES_HIDDEN ON)
 target_compile_options(
   ${PROJECT_NAME}
-  PRIVATE -fno-exceptions
+  PRIVATE -funsafe-math-optimizations # who wouldn't want fun and safe math optimizations?
+          -fno-exceptions
           -fno-rtti
           -fstrict-aliasing
           -fno-plt
@@ -97,7 +101,7 @@ target_compile_options(
           -Wextra
           -Werror
           -fno-unwind-tables
-          -fno-asynchronous-unwind-tables)
+          -fno-asynchronous-unwind-tables -fopenmp-simd)
 
 if(ENABLE_LTO)
   include(CheckIPOSupported)
