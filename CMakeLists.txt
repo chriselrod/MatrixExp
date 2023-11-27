@@ -4,7 +4,8 @@ project(MatrixExp LANGUAGES CXX)
 
 option(ENABLE_NATIVE_COMPILATION "Compile with -march=native" ON)
 option(ENABLE_LTO "Compile with link time optimizations" OFF)
-option(USE_WIDE_VECTORS "Set wide vectors even though compilers are bad at optimizing" ON)
+option(USE_WIDE_VECTORS
+       "Set wide vectors even though compilers are bad at optimizing" ON)
 
 include(FetchContent)
 
@@ -13,8 +14,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 FetchContent_Declare(
   Math
   GIT_REPOSITORY git@github.com:LoopModels/Math.git
-  GIT_TAG origin/simd)
-  # GIT_TAG origin/main)
+  GIT_TAG origin/main)
 
 FetchContent_MakeAvailable(Math)
 
@@ -24,7 +24,7 @@ file(GLOB_RECURSE sources CONFIGURE_DEPENDS
      ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp)
 add_library(${PROJECT_NAME} SHARED ${headers} ${sources})
 target_link_libraries(MatrixExp Math)
-target_include_directories( 
+target_include_directories(
   ${PROJECT_NAME}
   PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
           $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>)
@@ -51,12 +51,13 @@ if(ENABLE_NATIVE_COMPILATION)
   if(CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
     target_compile_options(${PROJECT_NAME} PRIVATE -xhost -qopt-zmm-usage=high)
   else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -march=native) 
-    if (USE_WIDE_VECTORS)
+    target_compile_options(${PROJECT_NAME} PRIVATE -march=native)
+    if(USE_WIDE_VECTORS)
       include(CheckCXXCompilerFlag)
       check_cxx_compiler_flag("-mprefer-vector-width=512" VEC512)
       if(VEC512)
-        target_compile_options(${PROJECT_NAME} PRIVATE -mprefer-vector-width=512)
+        target_compile_options(${PROJECT_NAME}
+                               PRIVATE -mprefer-vector-width=512)
       endif()
     endif()
   endif()
@@ -68,14 +69,11 @@ if(NOT N EQUAL 0)
   # 50 tasks
   math(EXPR N "(${N} + 49) / ${N}")
   message(STATUS "Using ${N} batch size")
-set_target_properties(${PROJECT_NAME} PROPERTIES
-                      UNITY_BUILD_MODE BATCH
-                      UNITY_BUILD_BATCH_SIZE ${N}
-)
+  set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD_MODE BATCH
+                                                   UNITY_BUILD_BATCH_SIZE ${N})
 else()
-set_target_properties(${PROJECT_NAME} PROPERTIES
-                      UNITY_BUILD_MODE BATCH
-                      UNITY_BUILD_BATCH_SIZE 0)  
+  set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD_MODE BATCH
+                                                   UNITY_BUILD_BATCH_SIZE 0)
 endif()
 
 set_target_properties(
@@ -85,7 +83,8 @@ set_target_properties(
              VISIBILITY_INLINES_HIDDEN ON)
 target_compile_options(
   ${PROJECT_NAME}
-  PRIVATE -funsafe-math-optimizations # who wouldn't want fun and safe math optimizations?
+  PRIVATE -funsafe-math-optimizations # who wouldn't want fun and safe math
+                                      # optimizations?
           -fno-exceptions
           -fno-rtti
           -fstrict-aliasing
@@ -101,7 +100,8 @@ target_compile_options(
           -Wextra
           -Werror
           -fno-unwind-tables
-          -fno-asynchronous-unwind-tables -fopenmp-simd)
+          -fno-asynchronous-unwind-tables
+          -fopenmp-simd)
 
 if(ENABLE_LTO)
   include(CheckIPOSupported)
@@ -118,4 +118,3 @@ else() # temps aren't interesting with LTO
 endif()
 
 # target_precompile_headers(${PROJECT_NAME} PRIVATE <algorithm>)
-
