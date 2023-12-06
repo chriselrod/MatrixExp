@@ -70,24 +70,28 @@ end
 We need some boiler plate to deal with large numbers of different types in stable manner by iterating over tuples.
 The code calculates a matrix exponential after scaling an input, and accumulates a sum of the results.
 Lets create some test case matrices:
-```julia using ForwardDiff d(x, n) =
-  ForwardDiff.Dual(x, ntuple(_->randn(), n)) function dualify(A, n, j) n == 0 &&
-      return A j == 0
-    ? d.(A, n)
-    : d.(d.(A, n), j)end
-      randdual(n, dinner, douter) = dualify(rand(n, n), dinner,
-                                            douter) max_size = 5;
-As = map((0, 1, 2)) do dout #outer dual map(
-  ntuple(identity, Val(9)).-
-  1) do din #inner dual map(ntuple(identity, Val(max_size - 1)).+
-                            1) do n #matrix size randdual(n, din, dout)
-  end end end;
+```julia
+using ForwardDiff
+d(x, n) = ForwardDiff.Dual(x, ntuple(_->randn(), n))
+function dualify(A, n, j)
+  n == 0 && return A
+  j == 0 ? d.(A, n) : d.(d.(A, n), j)
+end
+randdual(n, dinner, douter) = dualify(rand(n, n), dinner, douter)
+max_size = 5;
+As = map((0, 1, 2)) do dout #outer dual
+  map( ntuple(identity, Val(9)) .- 1) do din #inner dual
+    map(ntuple(identity, Val(max_size - 1)) .+ 1) do n #matrix size
+      randdual(n, din, dout)
+    end
+  end
+end;
 Bs = rmap(similar, As);
 ```
 
   Lets set C++ as a baseline with this.We'll base our implementation on [StaticArrays.exp](https://github.com/JuliaArrays/StaticArrays.jl/blob/72d2bd3538235c9162f630a5130112b83eaa0af7/src/expm.jl#L75-L129), as this implementation is simpler than the one from `ExponentialUtilities.jl`. The core of our C++ implementation is only 50 lines of code:
-```cpp template <typename T>
-  constexpr void expm(MutSquarePtrMatrix<T> A) {
+```cpp
+template <typename T> constexpr void expm(MutSquarePtrMatrix<T> A) {
   ptrdiff_t n = ptrdiff_t(A.numRow()), s = 0;
   SquareMatrix<T> A2{SquareDims<>{{n}}}, U_{SquareDims<>{{n}}};
   MutSquarePtrMatrix<T> U{U_};
@@ -137,22 +141,24 @@ Bs = rmap(similar, As);
   LU::ldiv(U, MutPtrMatrix<T>(A));
   for (; s--; std::swap(A, U)) U << A * A;
 }
-``` Now, to compile it
-```julia withenv("CXX" = > "clang++") do
-  @time run(`cmake - S.- B buildclang -
-              DCMAKE_BUILD_TYPE = Release - DCMAKE_UNITY_BUILD = ON`) end
-  withenv("CXX" = > "g++") do
-  @time run(`cmake - S.- B buildgcc -
-              DCMAKE_BUILD_TYPE = Release - DCMAKE_UNITY_BUILD = ON`) end
-  @time run(`cmake-- build buildclang`);
-@time run(`cmake-- build buildgcc`);
-``` This compiled all combinations we need; lets wrap them so we can call them.
+```
+Now, to compile it
+```julia
+withenv("CXX" => "clang++") do
+  @time run(`cmake -S . -B buildclang -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON`)
+end
+withenv("CXX" => "g++") do
+  @time run(`cmake -S . -B buildgcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON`)
+end
+@time run(`cmake --build buildclang`);
+@time run(`cmake --build buildgcc`);
+```
+This compiled all combinations we need; lets wrap them so we can call them.
 ```julia
 const libExpMatGCC = joinpath(@__DIR__, "buildgcc/libMatrixExp.so")
 const libExpMatClang = joinpath(@__DIR__, "buildclang/libMatrixExp.so")
 for (lib, cc) in ((:libExpMatGCC, :gcc), (:libExpMatClang, :clang))
   j = Symbol(cc, :expm!)
-
   @eval $j(A::Matrix{Float64}) =
     @ccall $lib.expmf64(A::Ptr{Float64}, size(A, 1)::Clong)::Nothing
   for n = 1:8
@@ -172,12 +178,12 @@ end
 So, now, let's set clang as baseline (as it uses LLVM, like Julia):
 ```julia
 testrange = range(0.001, stop = 6.0, length=1<<16);
-resclang = @time @eval do_multithreaded_work !(clangexpm !, Bs, As, testrange);
+resclang = @time @eval do_multithreaded_work!(clangexpm!, Bs, As, testrange);
 GC.gc();
-t_clang = @elapsed do_multithreaded_work !(clangexpm !, Bs, As, testrange);
-resgcc = @time @eval do_multithreaded_work !(gccexpm !, Bs, As, testrange);
+t_clang = @elapsed do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+resgcc = @time @eval do_multithreaded_work!(gccexpm!, Bs, As, testrange);
 GC.gc();
-t_gcc = @elapsed do_multithreaded_work !(gccexpm !, Bs, As, testrange);
+t_gcc = @elapsed do_multithreaded_work!(gccexpm!, Bs, As, testrange);
 @show t_clang t_gcc;
 ```
 
@@ -190,12 +196,12 @@ A = rand(4, 4)
 using ExponentialUtilities
 ForwardDiff.gradient(sum∘exponential!∘copy, A);
 #no throw
-``` It could be this just works great and we can go home /
-  end the blog post early.=) So,
-  let's see how it compares.
-```julia res = @time do_multithreaded_work !(exponential !, Bs, As, testrange);
+```
+It could be this just works great and we can go home / end the blog post early. =) So, let's see how it compares.
+```julia
+res = @time do_multithreaded_work!(exponential!, Bs, As, testrange);
 GC.gc();
-t_exputils = @elapsed do_multithreaded_work !(exponential !, Bs, As, testrange);
+t_exputils = @elapsed do_multithreaded_work!(exponential!, Bs, As, testrange);
 @show t_exputils;
 ```
 Oof -- compare both that compile time, and the runtime!
@@ -339,11 +345,12 @@ end
 ```
 This should do roughly the same thing;
 does it help ?
-```julia resexpm =
-   @time @eval do_multithreaded_work !(expm !, Bs, As, testrange);
-@test approxd(res, resexpm) GC.gc();
-t_expm =
-  @elapsed do_multithreaded_work !(expm !, Bs, As, testrange) @show t_expm;
+```julia
+resexpm = @time @eval do_multithreaded_work!(expm!, Bs, As, testrange);
+@test approxd(res, resexpm)
+GC.gc();
+t_expm = @elapsed do_multithreaded_work!(expm!, Bs, As, testrange)
+@show t_expm;
 cmpplot(
   ["Clang", "GCC", "ExponentialUtilities.jl", "expm!"],
   [1.0, t_gcc/t_clang, t_exputils/t_clang, t_expm/t_clang]
@@ -610,9 +617,7 @@ The most striking differences here are in the number of instructions, and in the
 
 With this in mind, the next optimization to try would be [ForwardDiff#570](https://github.com/JuliaDiff/ForwardDiff.jl/pull/570), a PR which adds explicit SIMD accumulation of partials.
 Trying it on Julia master, I get:
-```{
-  julia;
-  eval = false}
+```{julia; eval = false}
 julia> GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
   1.652008 seconds (21.29 M allocations: 728.877 MiB, 4.53% gc time)
 
@@ -632,9 +637,7 @@ versioninfo()
 
 
 To build the notebook, you need Clang 17 installed on the path and Weave.
-```{
-  julia;
-  eval = false}
+```{julia; eval = false}
 using Weave
 weave("bench_notebook.jmd", informat="markdown", doctype="github")
 ```
