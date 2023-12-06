@@ -72,7 +72,7 @@ As = map((0, 1, 2)) do dout # outer dual
 end;
 Bs = rmap(similar, As);
 
-testrange = range(0.001; stop = 6.0, length = 1_000)
+testrange = range(0.001; stop = 6.0, length = 2_000)
 # res = @time @eval do_multithreaded_work!(exponential!, Bs, As, testrange);
 # @time do_multithreaded_work!(exponential!, Bs, As, testrange);
 
@@ -118,6 +118,8 @@ reinterpret(Float64, B4_7) ≈ reinterpret(Float64, C4_7)
   end
 end
 
+res = @time @eval do_multithreaded_work!(exponential!, Bs, As, testrange);
+
 rescpp = @time @eval do_multithreaded_work!(clangexpm!, Bs, As, testrange);
 approxd(x, y) = isapprox(x, y)
 function approxd(x::ForwardDiff.Dual, y::ForwardDiff.Dual)
@@ -129,8 +131,8 @@ approxd(x::Tuple, y::Tuple) = all(map(approxd, x, y))
 @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
 
 using LinearAlgebra
-# My C++ `opnorm` implementation only looks at Dual's values
-# so lets just go ahead and copy that optimization here.
+#My C++ `opnorm` implementation only looks at Dual's values
+#so lets just go ahead and copy that optimization here.
 _deval(x) = x
 _deval(x::ForwardDiff.Dual) = _deval(ForwardDiff.value(x))
 function opnorm1(A)
@@ -145,9 +147,9 @@ function opnorm1(A)
   return n
 end
 
-# Let's also immediately implement our own `evalpoly` to cut down
-# allocations. `B` contains the result, `A` is a temporary
-# that we reuse (following the same approach as in C++)
+#Let's also immediately implement our own `evalpoly` to cut down
+#allocations. `B` contains the result, `A` is a temporary
+#that we reuse(following the same approach as in C++)
 function matevalpoly!(B, A, C, t::NTuple, N)
   @assert N > 1
   if isodd(N)
@@ -155,7 +157,7 @@ function matevalpoly!(B, A, C, t::NTuple, N)
   end
   B .= t[1] .* C
   @view(B[diagind(B)]) .+= t[2]
-  for n = 3:N
+  for n in 3:N
     A, B = B, A
     mul!(B, A, C)
     @view(B[diagind(B)]) .+= t[n]
@@ -169,17 +171,17 @@ function expm!(A::AbstractMatrix)
   N = size(A, 1)
   s = 0
   N == size(A, 2) || error("Matrix is not square.")
-  A2 = A * A
+  A2 = similar(A)
   U = similar(A)
   if (nA = opnorm1(A); nA <= 0.015)
-    mul!(U, A, A2 + 60.0I)
-    # broadcasting doesn't work with `I`
+    mul!(A2, A, A)
+    mul!(U, A, A2 + 60.0I) # broadcasting doesn't work with `I`
     A .= 12.0 .* A2
     @view(A[diagind(A)]) .+= 120.0
   else
     B = similar(A)
-    if nA <= 2.1
-      # No need to specialize on different tuple sizes
+    if nA <= 2.1 #No need to specialize on different tuple sizes
+      mul!(A2, A, A)
       if nA > 0.95
         p0 = (1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0)
         p1 = (90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10)
@@ -198,40 +200,38 @@ function expm!(A::AbstractMatrix)
       matevalpoly!(A, B, A2, p1, N)
     else
       s = nA > 5.4 ? log2ceil(nA / 5.4) : 0
-      t = (s > 0) ? exp2(-s) : 0.0
-      (s > 0) && (A2 .*= t * t)
+      if isodd(s) # need to swap
+          A, U = U, A # as we have an odd number of swaps at the end
+          A .= U .* exp2(-s)
+      elseif s > 0
+          A .*= exp2(-s)
+      end
+      mul!(A2, A, A)
       A4 = A2 * A2
       A6 = A2 * A4
-      # we use `U` as a temporary here that we didn't
-      # need in the C++ code for the estrin-style polynomial
-      # evaluation. Thankfully we don't need another allocation!
+      #we use `U` as a temporary here that we didn't
+      #need in the C++ code for the estrin - style polynomial
+      #evaluation.Thankfully we don't need another allocation!
       @. U = A6 + 16380 * A4 + 40840800 * A2
       mul!(B, A6, U)
       @. B += 33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2
       @view(B[diagind(B)]) .+= 32382376266240000
       mul!(U, A, B)
-      # Like in the C++ code, we swap A and U `s` times at the end
-      # so if `s` is odd, we pre-swap to end with the original
       # `A` being filled by the answer
-      if isodd(s)
-        A .= U .* t
-        A, U = U, A
-      elseif s > 0
-        U .*= t
-      end
-      # we use `B` as a temporary here we didn't
-      # need in the C++ code
+      #we use `B` as a temporary here we didn't
+      #need in the C++ code
       @. B = 182 * A6 + 960960 * A4 + 1323241920 * A2
       mul!(A, A6, B)
-      @. A += 670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2
+      @. A += 670442572800 * A6 + 129060195264000 * A4 +
+              7771770303897600 * A2
       @view(A[diagind(A)]) .+= 64764752532480000
     end
   end
-  @inbounds for i in eachindex(A, U)
+  @inbounds for i = eachindex(A, U)
     A[i], U[i] = A[i] + U[i], A[i] - U[i]
   end
   ldiv!(lu!(U), A)
-  for _ = 1:s
+  for _ in 1:s
     mul!(U, A, A)
     A, U = U, A
   end
@@ -243,40 +243,28 @@ resexpm = @time @eval do_multithreaded_work!(expm!, Bs, As, testrange);
 @time do_multithreaded_work!(expm!, Bs, As, testrange);
 
 function mulreduceinnerloop!(C, A, B)
-  AxM = axes(A, 1)
-  AxK = axes(A, 2) # we use two `axes` calls in case of `AbstractVector`
-  BxK = axes(B, 1)
-  BxN = axes(B, 2)
-  CxM = axes(C, 1)
-  CxN = axes(C, 2)
-  if AxM != CxM
-    throw(
-      DimensionMismatch(
-        lazy"matrix A has axes ($AxM,$AxK), matrix C has axes ($CxM,$CxN)"
-      )
-    )
-  end
-  if AxK != BxK
-    throw(
-      DimensionMismatch(
-        lazy"matrix A has axes ($AxM,$AxK), matrix B has axes ($BxK,$CxN)"
-      )
-    )
-  end
-  if BxN != CxN
-    throw(
-      DimensionMismatch(
-        lazy"matrix B has axes ($BxK,$BxN), matrix C has axes ($CxM,$CxN)"
-      )
-    )
-  end
-  @inbounds for n in BxN, m in AxM
-    Cmn = zero(eltype(C))
-    for k in BxK
-      Cmn = muladd(A[m, k], B[k, n], Cmn)
+    AxM = axes(A, 1)
+    AxK = axes(A, 2) # we use two `axes` calls in case of `AbstractVector`
+    BxK = axes(B, 1)
+    BxN = axes(B, 2)
+    CxM = axes(C, 1)
+    CxN = axes(C, 2)
+    if AxM != CxM
+        throw(DimensionMismatch(lazy"matrix A has axes ($AxM,$AxK), matrix C has axes ($CxM,$CxN)"))
     end
-    C[m, n] = Cmn
-  end
+    if AxK != BxK
+        throw(DimensionMismatch(lazy"matrix A has axes ($AxM,$AxK), matrix B has axes ($BxK,$CxN)"))
+    end
+    if BxN != CxN
+      throw(DimensionMismatch(lazy"matrix B has axes ($BxK,$BxN), matrix C has axes ($CxM,$CxN)"))
+    end
+    @inbounds for n = BxN, m = AxM
+        Cmn = zero(eltype(C))
+        for k = BxK
+            Cmn = muladd(A[m,k], B[k,n], Cmn)
+        end
+      C[m,n] = Cmn
+    end
   return C
 end
 function matevalpoly_custommul!(B, A, C, t::NTuple, N)
@@ -286,7 +274,7 @@ function matevalpoly_custommul!(B, A, C, t::NTuple, N)
   end
   B .= t[1] .* C
   @view(B[diagind(B)]) .+= t[2]
-  for n = 3:N
+  for n in 3:N
     A, B = B, A
     mulreduceinnerloop!(B, A, C)
     @view(B[diagind(B)]) .+= t[n]
@@ -297,17 +285,19 @@ function expm_custommul!(A::AbstractMatrix)
   N = size(A, 1)
   s = 0
   N == size(A, 2) || error("Matrix is not square.")
-  A2 = mulreduceinnerloop!(similar(A), A, A)
+  A2 = similar(A)
   U = similar(A)
   if (nA = opnorm1(A); nA <= 0.015)
+    mulreduceinnerloop!(A2, A, A)
     mulreduceinnerloop!(U, A, A2 + 60.0I)
-    # broadcasting doesn't work with `I`
+    #broadcasting doesn't work with `I`
     A .= 12.0 .* A2
     @view(A[diagind(A)]) .+= 120.0
   else
     B = similar(A)
     if nA <= 2.1
-      # No need to specialize on different tuple sizes
+      mulreduceinnerloop!(A2, A, A)
+      #No need to specialize on different tuple sizes
       if nA > 0.95
         p0 = (1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0)
         p1 = (90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10)
@@ -326,40 +316,40 @@ function expm_custommul!(A::AbstractMatrix)
       matevalpoly_custommul!(A, B, A2, p1, N)
     else
       s = nA > 5.4 ? log2ceil(nA / 5.4) : 0
-      t = (s > 0) ? exp2(-s) : 0.0
-      (s > 0) && (A2 .*= t * t)
+      if isodd(s) # need to swap
+        A, U = U, A # as we have an odd number of swaps at the end
+        A .= U .* exp2(-s)
+      elseif s > 0
+        A .*= exp2(-s)
+      end
+      mulreduceinnerloop!(A2, A, A)
       A4 = mulreduceinnerloop!(similar(A), A2, A2)
       A6 = mulreduceinnerloop!(similar(A), A2, A4)
-      # we use `U` as a temporary here that we didn't
-      # need in the C++ code for the estrin-style polynomial
-      # evaluation. Thankfully we don't need another allocation!
+      #we use `U` as a temporary here that we didn't
+      #need in the C++ code for the estrin - style polynomial
+      #evaluation.Thankfully we don't need another allocation!
       @. U = A6 + 16380 * A4 + 40840800 * A2
       mulreduceinnerloop!(B, A6, U)
       @. B += 33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2
       @view(B[diagind(B)]) .+= 32382376266240000
       mulreduceinnerloop!(U, A, B)
-      # Like in the C++ code, we swap A and U `s` times at the end
-      # so if `s` is odd, we pre-swap to end with the original
+      #Like in the C++ code, we swap A and U `s` times at the end
+      #so if `s` is odd, we pre - swap to end with the original
       # `A` being filled by the answer
-      if isodd(s)
-        A .= U .* t
-        A, U = U, A
-      elseif s > 0
-        U .*= t
-      end
-      # we use `B` as a temporary here we didn't
-      # need in the C++ code
+      #we use `B` as a temporary here we didn't
+      #need in the C++ code
       @. B = 182 * A6 + 960960 * A4 + 1323241920 * A2
       mulreduceinnerloop!(A, A6, B)
-      @. A += 670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2
+      @. A += 670442572800 * A6 + 129060195264000 * A4 +
+              7771770303897600 * A2
       @view(A[diagind(A)]) .+= 64764752532480000
     end
   end
-  @inbounds for i in eachindex(A, U)
+  @inbounds for i = eachindex(A, U)
     A[i], U[i] = A[i] + U[i], A[i] - U[i]
   end
   ldiv!(lu!(U), A)
-  for _ = 1:s
+  for _ in 1:s
     mulreduceinnerloop!(U, A, A)
     A, U = U, A
   end
@@ -374,7 +364,7 @@ t_expm_custommul =
 
 function tlssimilar(A)
   ret = get!(task_local_storage(), A) do
-    ntuple(_ -> similar(A), Val(5))
+    ntuple(_->similar(A), Val(5))
   end
   return ret::NTuple{5,typeof(A)}
 end
@@ -384,17 +374,18 @@ function expm_tls!(A::AbstractMatrix)
   s = 0
   N == size(A, 2) || error("Matrix is not square.")
   U, B, A2, A4, A6 = tlssimilar(A)
-  mulreduceinnerloop!(A2, A, A)
   if (nA = opnorm1(A); nA <= 0.015)
+    mulreduceinnerloop!(A2, A, A)
     B .= A2
     @view(B[diagind(B)]) .+= 60.0
     mulreduceinnerloop!(U, A, B)
-    # broadcasting doesn't work with `I`
+    #broadcasting doesn't work with `I`
     A .= 12.0 .* A2
     @view(A[diagind(A)]) .+= 120.0
   else
     if nA <= 2.1
-      # No need to specialize on different tuple sizes
+      mulreduceinnerloop!(A2, A, A)
+      #No need to specialize on different tuple sizes
       if nA > 0.95
         p0 = (1.0, 3960.0, 2162160.0, 302702400.0, 8821612800.0)
         p1 = (90.0, 110880.0, 3.027024e7, 2.0756736e9, 1.76432256e10)
@@ -413,40 +404,40 @@ function expm_tls!(A::AbstractMatrix)
       matevalpoly_custommul!(A, B, A2, p1, N)
     else
       s = nA > 5.4 ? log2ceil(nA / 5.4) : 0
-      t = (s > 0) ? exp2(-s) : 0.0
-      (s > 0) && (A2 .*= t * t)
+      if isodd(s) # need to swap
+        A, U = U, A # as we have an odd number of swaps at the end
+        A .= U .* exp2(-s)
+      elseif s > 0
+        A .*= exp2(-s)
+      end
+      mulreduceinnerloop!(A2, A, A)
       mulreduceinnerloop!(A4, A2, A2)
       mulreduceinnerloop!(A6, A2, A4)
-      # we use `U` as a temporary here that we didn't
-      # need in the C++ code for the estrin-style polynomial
-      # evaluation. Thankfully we don't need another allocation!
+      #we use `U` as a temporary here that we didn't
+      #need in the C++ code for the estrin - style polynomial
+      #evaluation.Thankfully we don't need another allocation!
       @. U = A6 + 16380 * A4 + 40840800 * A2
       mulreduceinnerloop!(B, A6, U)
       @. B += 33522128640 * A6 + 10559470521600 * A4 + 1187353796428800 * A2
       @view(B[diagind(B)]) .+= 32382376266240000
       mulreduceinnerloop!(U, A, B)
-      # Like in the C++ code, we swap A and U `s` times at the end
-      # so if `s` is odd, we pre-swap to end with the original
+      #Like in the C++ code, we swap A and U `s` times at the end
+      #so if `s` is odd, we pre - swap to end with the original
       # `A` being filled by the answer
-      if isodd(s)
-        A .= U .* t
-        A, U = U, A
-      elseif s > 0
-        U .*= t
-      end
-      # we use `B` as a temporary here we didn't
-      # need in the C++ code
+      #we use `B` as a temporary here we didn't
+      #need in the C++ code
       @. B = 182 * A6 + 960960 * A4 + 1323241920 * A2
       mulreduceinnerloop!(A, A6, B)
-      @. A += 670442572800 * A6 + 129060195264000 * A4 + 7771770303897600 * A2
+      @. A += 670442572800 * A6 + 129060195264000 * A4 +
+              7771770303897600 * A2
       @view(A[diagind(A)]) .+= 64764752532480000
     end
   end
-  @inbounds for i in eachindex(A, U)
+  @inbounds for i = eachindex(A, U)
     A[i], U[i] = A[i] + U[i], A[i] - U[i]
   end
   ldiv!(lu!(U), A)
-  for _ = 1:s
+  for _ in 1:s
     mulreduceinnerloop!(U, A, A)
     A, U = U, A
   end
@@ -457,19 +448,26 @@ restls = @time @eval do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 
 testrange = range(0.001; stop = 6.0, length = 30_000)
-@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
-@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+testrange = range(0.001, stop = 6.0, length=1<<16);
+GC.gc(); @time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 testrange = range(0.001; stop = 6.0, length = 100_000)
-@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
-@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
-@time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(gccexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(clangexpm!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
+GC.gc(); @time do_multithreaded_work!(expm_tls!, Bs, As, testrange);
 
 # compared to current version, the fastest version did not have
 # # `[[gnu::always_inline]]` on `Dual` ops and also used 256-bit vectors.
